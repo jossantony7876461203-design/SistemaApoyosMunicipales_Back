@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="SistemaApoyosMunicipales.Application/SistemaApoyosMunicipales.Application.csproj" />
+  <Project Path="SistemaApoyosMunicipales.Domain/SistemaApoyosMunicipales.Domain.csproj" />
+  <Project Path="SistemaApoyosMunicipales.Infrastructure/SistemaApoyosMunicipales.Infrastructure.csproj" />
+  <Project Path="SistemaApoyosMunicipales/SistemaApoyosMunicipales.API.csproj" />
+</Solution>

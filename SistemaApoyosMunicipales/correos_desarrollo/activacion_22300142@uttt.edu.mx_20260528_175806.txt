@@ -1,0 +1,12 @@
+============================================
+SIMULACIÓN DE CORREO - MODO DESARROLLO
+============================================
+Para:      22300142@uttt.edu.mx
+Nombre:    Jose Antonio Martinez Lopez
+Fecha:     28/05/2026 17:58:06
+--------------------------------------------
+LINK DE ACTIVACIÓN:
+http://localhost:5173/activar?token=A1560F997489115A72C0E45C055705B53777A21DA45E851076E55EEA40AF14C2
+--------------------------------------------
+Copia y pega el link en el navegador.
+============================================

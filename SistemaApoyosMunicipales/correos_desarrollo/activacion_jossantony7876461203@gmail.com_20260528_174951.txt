@@ -1,0 +1,12 @@
+============================================
+SIMULACIÓN DE CORREO - MODO DESARROLLO
+============================================
+Tipo:      activacion
+Para:      jossantony7876461203@gmail.com
+Nombre:    Jose Antonio Martinez Lopez
+Fecha:     28/05/2026 17:49:51
+--------------------------------------------
+TOKEN:     230C74873ED4527E68C79B79689D82781C941CEC8C5F05E774B360FA5FDE6A58
+--------------------------------------------
+Usa este token para activar la cuenta.
+============================================
