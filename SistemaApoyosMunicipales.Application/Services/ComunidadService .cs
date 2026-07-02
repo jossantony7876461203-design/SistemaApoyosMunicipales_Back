@@ -2,6 +2,7 @@
 using SistemaApoyosMunicipales.Application.DTOs.Comunidad;
 using SistemaApoyosMunicipales.Application.Interfaces.Auth;
 using SistemaApoyosMunicipales.Application.Interfaces.Persistence;
+using SistemaApoyosMunicipales.Application.Interfaces.Storage;
 using SistemaApoyosMunicipales.Domain.Exceptions;
 using System;
 using System.Collections.Generic;
@@ -13,17 +14,23 @@ namespace SistemaApoyosMunicipales.Application.Services
     {
         private readonly IComunidadRepository _comunidadRepository;
         private readonly IUnitOfWork _unitOfWork;
+        private readonly ICloudinaryService _cloudinaryService;
+        private readonly IImagenQueue _imagenQueue;
 
         public ComunidadService(
             IComunidadRepository comunidadRepository,
-            IUnitOfWork unitOfWork)
+            IUnitOfWork unitOfWork,
+              ICloudinaryService cloudinaryService,
+              IImagenQueue imagenQueue)
         {
             _comunidadRepository = comunidadRepository;
             _unitOfWork = unitOfWork;
+            _cloudinaryService = cloudinaryService;
+            _imagenQueue = imagenQueue;
         }
 
 
-        public async Task CrearAsync(CrearComunidadDto dto)
+        public async Task<Guid?> CrearAsync(CrearComunidadDto dto)
         {
             var existe = await _comunidadRepository
                 .ObtenerPorClaveInternaAsync(dto.ClaveInterna);
@@ -32,6 +39,7 @@ namespace SistemaApoyosMunicipales.Application.Services
                 throw new ValidationException(
                     "La clave interna ya se encuentra registrada.");
 
+            // 1. Crear comunidad SIN imagen primero
             var comunidad = new Domain.Entities.Comunidad.Comunidad
             {
                 Id = Guid.NewGuid(),
@@ -46,10 +54,88 @@ namespace SistemaApoyosMunicipales.Application.Services
             };
 
             await _comunidadRepository.AgregarAsync(comunidad);
-
             await _unitOfWork.SaveChangesAsync();
+
+            // 2. Si hay imagen, encolar en background
+            Guid? tareaId = null;
+
+            if (dto.DelegadoIne is not null)
+            {
+                // Leer bytes aquí porque IFormFile no es thread-safe
+                await using var stream = dto.DelegadoIne.OpenReadStream();
+                var bytes = new byte[stream.Length];
+                await stream.ReadAsync(bytes);
+
+                var tarea = new ImagenTarea
+                {
+                    NombreArchivo = dto.DelegadoIne.FileName,
+                    Bytes = bytes,
+                    Carpeta = "comunidades/ine",
+                    EntidadId = comunidad.Id
+                };
+
+                _imagenQueue.Encolar(tarea);
+                tareaId = tarea.Id;
+            }
+
+            return tareaId; // null si no había imagen
         }
 
+        // =========================================================
+        // Actualizar solo la imagen del INE
+        // =========================================================
+        public async Task ActualizarIneAsync(Guid id, ActualizarIneDto dto)
+        {
+            var comunidad = await _comunidadRepository
+                .ObtenerPorIdParaEditarAsync(id);
+
+            if (comunidad is null)
+                throw new NotFoundException("La comunidad no existe.");
+
+            string? pubIdAnterior = comunidad.DelegadoInePubId;
+            string? pubIdSubido = null;
+
+            await _unitOfWork.BeginTransactionAsync();
+
+            try
+            {
+                // 1. Subir imagen nueva
+                await using var stream = dto.Imagen.OpenReadStream();
+
+                var resultado = await _cloudinaryService.SubirImagenAsync(
+                    stream,
+                    dto.Imagen.FileName,
+                    "comunidades/ine");
+
+                pubIdSubido = resultado.PublicId;
+
+                // 2. Actualizar entidad
+                comunidad.DelegadoIneUrl = resultado.Url;
+                comunidad.DelegadoInePubId = resultado.PublicId;
+                comunidad.UpdatedAt = DateTimeOffset.UtcNow;
+
+                // 3. Guardar en BD
+                await _unitOfWork.SaveChangesAsync();
+
+                // 4. Confirmar transacción
+                await _unitOfWork.CommitAsync();
+
+                // 5. Eliminar imagen anterior de Cloudinary
+                // Se hace DESPUÉS del commit para no bloquear si falla
+                if (pubIdAnterior is not null)
+                    await _cloudinaryService.EliminarImagenAsync(pubIdAnterior);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackAsync();
+
+                // Si la imagen nueva ya subió pero la BD falló, eliminarla
+                if (pubIdSubido is not null)
+                    await _cloudinaryService.EliminarImagenAsync(pubIdSubido);
+
+                throw;
+            }
+        }
 
         public async Task<ComunidadDto> ObtenerPorIdAsync(Guid id)
         {
@@ -68,7 +154,9 @@ namespace SistemaApoyosMunicipales.Application.Services
                 CodigoPostal = comunidad.CodigoPostal,
                 Delegado = comunidad.Delegado,
                 TelefonoDelegado = comunidad.TelefonoDelegado,
-                Activo=comunidad.Activo
+                Activo=comunidad.Activo,
+                DelegadoIneUrl = comunidad.DelegadoIneUrl
+
             };
         }
 
@@ -176,7 +264,8 @@ namespace SistemaApoyosMunicipales.Application.Services
                         CodigoPostal = x.CodigoPostal,
                         Delegado = x.Delegado,
                         TelefonoDelegado = x.TelefonoDelegado,
-                        Activo=x.Activo
+                        Activo=x.Activo,
+                        DelegadoIneUrl = x.DelegadoIneUrl
                     })
                     .ToList(),
 

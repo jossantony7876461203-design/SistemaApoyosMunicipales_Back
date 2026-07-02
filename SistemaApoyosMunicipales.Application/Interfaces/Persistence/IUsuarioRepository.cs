@@ -31,5 +31,10 @@ namespace SistemaApoyosMunicipales.Application.Interfaces.Persistence
             bool activos = true);
 
         Task AsignarRolAsync(Guid usuarioId, Guid rolId, Guid? subRolId = null);
+        Task CambiarEstatusAsync(
+    Guid usuarioId,
+    bool activo);
+
+
     }
 }

@@ -75,6 +75,14 @@ namespace SistemaApoyosMunicipales.Infrastructure.Persistence.Configurations
             builder.HasIndex(c => new { c.Id, c.ClaveInterna })
                    .HasDatabaseName("idx_comunidades_operacionales")
                    .HasFilter("activo = true");
+
+            builder.Property(c => c.DelegadoIneUrl)
+    .HasColumnName("delegado_ine_url")
+    .HasMaxLength(500);
+
+            builder.Property(c => c.DelegadoInePubId)
+                .HasColumnName("delegado_ine_pub_id")
+                .HasMaxLength(200);
         }
     }
 }

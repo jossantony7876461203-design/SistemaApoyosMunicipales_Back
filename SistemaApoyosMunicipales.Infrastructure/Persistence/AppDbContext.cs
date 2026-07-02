@@ -1,6 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using SistemaApoyosMunicipales.Domain.Entities.Apoyo;
 using SistemaApoyosMunicipales.Domain.Entities.Auth;
 using SistemaApoyosMunicipales.Domain.Entities.Comunidad;
+using SistemaApoyosMunicipales.Domain.Entities.Documentos;
+using SistemaApoyosMunicipales.Domain.Entities.RegistroDeApoyos;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -25,7 +28,10 @@ namespace SistemaApoyosMunicipales.Infrastructure.Persistence
         public DbSet<Comunidad> Comunidades => Set<Comunidad>();
 
 
+        public DbSet<RegistroApoyo> RegistroApoyos => Set<RegistroApoyo>();
+        public DbSet<RegistroApoyoDocumento> RegistroApoyoDocumentos => Set<RegistroApoyoDocumento>();
 
+        public DbSet<Apoyo> Apoyos=> Set<Apoyo>();
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             // Aplica automáticamente todas las clases Configuration de este ensamblado

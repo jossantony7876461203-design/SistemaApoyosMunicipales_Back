@@ -19,6 +19,7 @@ namespace SistemaApoyosMunicipales.Application.DTOs.Comunidad
         public string? TelefonoDelegado { get; set; }
 
         public bool Activo { get; set; } = true;
+        public string? DelegadoIneUrl { get; set; }
 
     }
 }

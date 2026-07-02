@@ -1,4 +1,5 @@
-﻿using SistemaApoyosMunicipales.Domain.Entities.Auth;
+﻿using SistemaApoyosMunicipales.Application.Common.Models;
+using SistemaApoyosMunicipales.Domain.Entities.Auth;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -13,9 +14,12 @@ namespace SistemaApoyosMunicipales.Application.Interfaces.Persistence
 
         Task<Rol?> ObtenerPorIdAsync(Guid id);
 
-        Task<IEnumerable<Rol>> ObtenerTodosAsync();
+        Task<PaginatedResult<Rol>> ObtenerTodosAsync(PaginationRequest request, bool activos);
 
         Task<IEnumerable<Rol>> ObtenerActivosAsync();
+        Task ActualizarAsync(Rol rol);
+        Task CambiarEstatusAsync(Guid id, bool activo);
+ 
     }
 
 

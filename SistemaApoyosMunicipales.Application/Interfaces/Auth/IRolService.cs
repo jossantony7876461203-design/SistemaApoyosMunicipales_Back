@@ -1,4 +1,6 @@
-﻿using SistemaApoyosMunicipales.Application.DTOs.Rol;
+﻿using SistemaApoyosMunicipales.Application.Common.Models;
+using SistemaApoyosMunicipales.Application.DTOs.Rol;
+using SistemaApoyosMunicipales.Application.Validators.Rol;
 using SistemaApoyosMunicipales.Domain.Entities.Auth;
 using System;
 using System.Collections.Generic;
@@ -10,6 +12,10 @@ namespace SistemaApoyosMunicipales.Application.Interfaces.Auth
     {
         Task<Guid> CrearRolAsync(CrearRolDto dto);
 
-        Task<IEnumerable<Rol>> ObtenerActivosAsync();
+        Task<PaginatedResult<RolDto>> ObtenerActivosAsync(PaginationRequest request);
+        Task ActualizarRolAsync(Guid id, ActualizarRolDto dto);
+        Task CambiarEstatusAsync(Guid id, CambiarEstatusRolDto dto);
+        Task<PaginatedResult<RolDto>> ObtenerInactivosAsync(PaginationRequest request);
+        Task<RolDto?> ObtenerPorIdAsync(Guid id);
     }
 }

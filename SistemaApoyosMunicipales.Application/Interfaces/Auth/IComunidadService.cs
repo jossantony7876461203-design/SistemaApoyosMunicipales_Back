@@ -8,7 +8,7 @@ namespace SistemaApoyosMunicipales.Application.Interfaces.Auth
 {
     public interface IComunidadService
     {
-        Task CrearAsync(CrearComunidadDto dto);
+        Task<Guid?> CrearAsync(CrearComunidadDto dto);
 
         Task<ComunidadDto> ObtenerPorIdAsync(Guid id);
 
@@ -27,5 +27,6 @@ namespace SistemaApoyosMunicipales.Application.Interfaces.Auth
         Task CambiarEstatusAsync(
     Guid id,
     CambiarEstatusComunidadDto dto);
+        Task ActualizarIneAsync(Guid id, ActualizarIneDto dto);
     }
 }

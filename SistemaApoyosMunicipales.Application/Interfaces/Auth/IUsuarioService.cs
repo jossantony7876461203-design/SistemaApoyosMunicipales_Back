@@ -1,14 +1,28 @@
 ﻿using SistemaApoyosMunicipales.Application.Common.Models;
 using SistemaApoyosMunicipales.Application.DTOs.Usuario;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace SistemaApoyosMunicipales.Application.Interfaces.Auth
 {
-    public  interface IUsuarioService
+    public interface IUsuarioService
     {
-        Task<PaginatedResult<ObtenerUsuariosRolDto>> ObtenerActivosAsync(PaginationRequest pagination);
-        //Task AsignarRolAsync(Guid usuarioId, Guid rolId, Guid? subRolId = null);
+        Task<PaginatedResult<ObtenerUsuariosRolDto>> ObtenerActivosAsync(
+            PaginationRequest pagination);
+
+        Task<PaginatedResult<ObtenerUsuariosRolDto>> ObtenerInactivosAsync(
+            PaginationRequest pagination);
+
+        Task<UsuarioDetalleDto> ObtenerPorIdAsync(Guid id);
+
+        Task CambiarEstatusAsync(
+            Guid usuarioId,
+            CambiarEstatusUsuarioDto dto);
+
+        Task ActualizarAsync(
+            Guid usuarioId,
+            ActualizarUsuarioDto dto);
+
+        Task AsignarRolAsync(          // ✅ descomentado
+            Guid usuarioId,
+            AsignarRolUsuarioDto dto);
     }
 }

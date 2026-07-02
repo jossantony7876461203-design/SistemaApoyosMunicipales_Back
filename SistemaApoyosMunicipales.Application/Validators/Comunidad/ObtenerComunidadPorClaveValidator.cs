@@ -9,6 +9,6 @@ public sealed class ObtenerComunidadPorClaveValidator
     {
         RuleFor(x => x)
             .NotEmpty()
-            .MaximumLength(50);
+            .MaximumLength(100);
     }
 }

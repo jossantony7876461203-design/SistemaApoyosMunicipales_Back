@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.AspNetCore.Http;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -15,5 +16,7 @@ namespace SistemaApoyosMunicipales.Application.DTOs.Comunidad
         public string? Delegado { get; set; }
 
         public string? TelefonoDelegado { get; set; }
+
+        public IFormFile? DelegadoIne { get; set; }
     }
 }

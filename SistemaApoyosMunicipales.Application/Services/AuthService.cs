@@ -1,4 +1,5 @@
 ﻿using SistemaApoyosMunicipales.Application.DTOs.Auth;
+using SistemaApoyosMunicipales.Application.DTOs.Permisos;
 using SistemaApoyosMunicipales.Application.Interfaces.Auth;
 using SistemaApoyosMunicipales.Application.Interfaces.Auth.SistemaApoyosMunicipales.Application.Interfaces.Auth;
 using SistemaApoyosMunicipales.Application.Interfaces.Persistence;
@@ -162,15 +163,7 @@ public sealed class AuthService : IAuthService
             Correo = usuario.Correo,
             Rol = usuarioConRol?.Rol?.Nombre ?? string.Empty,
             SubRol = usuarioConRol?.SubRol?.Nombre ?? string.Empty,
-            Permisos = permisos.Select(p => new PermisoDto
-            {
-                Modulo = p.Modulo,
-                Codigo = p.Permiso,
-                PuedeCrear = p.PuedeCrear,
-                PuedeLeer = p.PuedeLeer,
-                PuedeEditar = p.PuedeEditar,
-                PuedeEliminar = p.PuedeEliminar
-            }).ToList()
+            Permisos = permisos.ToList()
         };
     }
 

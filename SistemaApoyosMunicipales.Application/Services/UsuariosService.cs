@@ -5,6 +5,7 @@ using SistemaApoyosMunicipales.Application.Interfaces.Auth;
 using SistemaApoyosMunicipales.Application.Interfaces.Persistence;
 using SistemaApoyosMunicipales.Domain.Entities.Auth;
 using SistemaApoyosMunicipales.Domain.Exceptions;
+using SistemaApoyosMunicipales.Infrastructure.Repositories;
 
 namespace SistemaApoyosMunicipales.Application.Services;
 
@@ -12,24 +13,26 @@ public sealed class UsuariosService : IUsuarioService
 {
     private readonly IUsuarioRepository _usuarioRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IRolRepository _rolRepository;
+    private readonly ISubRolRepository _subRolRepository;  
 
     public UsuariosService(
         IUsuarioRepository usuarioRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IRolRepository rolRepository,
+        ISubRolRepository subRolRepository)            
     {
         _usuarioRepository = usuarioRepository;
         _unitOfWork = unitOfWork;
+        _rolRepository = rolRepository;
+        _subRolRepository = subRolRepository;          
     }
 
-
-
-
     // =========================================================
-    // 1. OBTENER TODOS (ACTIVOS)
+    // 1. OBTENER ACTIVOS
     // =========================================================
-
     public async Task<PaginatedResult<ObtenerUsuariosRolDto>> ObtenerActivosAsync(
-    PaginationRequest pagination)
+        PaginationRequest pagination)
     {
         var resultado =
             await _usuarioRepository.ObtenerTodosActivosAsync(pagination, true);
@@ -57,154 +60,156 @@ public sealed class UsuariosService : IUsuarioService
         };
     }
 
+    // =========================================================
+    // 2. OBTENER INACTIVOS
+    // =========================================================
+    public async Task<PaginatedResult<ObtenerUsuariosRolDto>> ObtenerInactivosAsync(
+        PaginationRequest pagination)
+    {
+        var resultado =
+            await _usuarioRepository.ObtenerTodosActivosAsync(pagination, false);
+
+        return new PaginatedResult<ObtenerUsuariosRolDto>
+        {
+            Items = resultado.Items.Select(x => new ObtenerUsuariosRolDto
+            {
+                Id = x.Id,
+                Nombre = x.Nombre,
+                Correo = x.Correo,
+                Rol = x.Rol?.Nombre,
+                SubRol = x.SubRol?.Nombre,
+                Activo = x.Activo
+            }).ToList(),
+
+            PageNumber = resultado.PageNumber,
+            PageSize = resultado.PageSize,
+            TotalRecords = resultado.TotalRecords,
+            TotalPages = resultado.TotalPages,
+            HasPreviousPage = resultado.HasPreviousPage,
+            HasNextPage = resultado.HasNextPage
+        };
+    }
+
+    // =========================================================
+    // 3. OBTENER POR ID
+    // =========================================================
+    public async Task<UsuarioDetalleDto> ObtenerPorIdAsync(Guid id)
+    {
+        var usuario = await _usuarioRepository.ObtenerConRolAsync(id);
+
+        if (usuario is null)
+            throw new NotFoundException("El usuario no existe.");
+
+        return new UsuarioDetalleDto
+        {
+            Id = usuario.Id,
+            Nombre = usuario.Nombre,
+            Correo = usuario.Correo,
+            Activo = usuario.Activo,
+            CorreoVerificado = usuario.CorreoVerificado,
+            UltimoAcceso = usuario.UltimoAcceso,
+            Rol = usuario.Rol?.Nombre,
+            SubRol = usuario.SubRol?.Nombre
+        };
+    }
+
+    // =========================================================
+    // 4. CAMBIAR ESTATUS
+    // =========================================================
+    public async Task CambiarEstatusAsync(
+        Guid usuarioId,
+        CambiarEstatusUsuarioDto dto)
+    {
+        var usuario = await _usuarioRepository.ObtenerPorIdAsync(usuarioId);
+
+        if (usuario is null)
+            throw new NotFoundException("El usuario no existe.");
+
+        await _usuarioRepository.CambiarEstatusAsync(usuarioId, dto.Activo);
+        await _unitOfWork.SaveChangesAsync();
+    }
+
+    // =========================================================
+    // 5. ACTUALIZAR
+    // =========================================================
+    public async Task ActualizarAsync(
+        Guid usuarioId,
+        ActualizarUsuarioDto dto)
+    {
+        var usuario = await _usuarioRepository.ObtenerPorIdAsync(usuarioId);
+
+        if (usuario is null)
+            throw new NotFoundException("El usuario no existe.");
+
+        if (!string.IsNullOrWhiteSpace(dto.Correo))
+        {
+            var correoNormalizado = dto.Correo.Trim();
+
+            if (!string.Equals(
+                    usuario.Correo,
+                    correoNormalizado,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                var existe =
+                    await _usuarioRepository.ExisteCorreoAsync(correoNormalizado);
+
+                if (existe)
+                    throw new ValidationException("El correo ya se encuentra registrado.");
+
+                usuario.Correo = correoNormalizado;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.Nombre))
+            usuario.Nombre = dto.Nombre.Trim();
+
+        await _unitOfWork.SaveChangesAsync();
+    }
+
+    // =========================================================
+    // 6. ASIGNAR ROL
+    // =========================================================
+    public async Task AsignarRolAsync(
+        Guid usuarioId,
+        AsignarRolUsuarioDto dto)
+    {
+        var usuario = await _usuarioRepository.ObtenerPorIdAsync(usuarioId);
+
+        if (usuario is null)
+            throw new NotFoundException("El usuario no existe.");
+
+        var rol = await _rolRepository.ObtenerPorIdAsync(dto.RolId);
+
+        if (rol is null)
+            throw new NotFoundException("El rol no existe.");
+
+        if (!rol.Activo)
+            throw new ValidationException("El rol se encuentra inactivo.");
+
+        if (dto.SubRolId.HasValue)
+        {
+            var subRol =
+                await _subRolRepository.ObtenerPorIdAsync(dto.SubRolId.Value);
+
+            if (subRol is null)
+                throw new NotFoundException("El subrol no existe.");
+
+            if (!subRol.Activo)
+                throw new ValidationException("El subrol se encuentra inactivo.");
+
+            if (subRol.RolId != dto.RolId)
+                throw new ValidationException(
+                    "El subrol no pertenece al rol seleccionado.");
+        }
+
+        await _usuarioRepository.AsignarRolAsync(
+            usuarioId,
+            dto.RolId,
+            dto.SubRolId);
+
+        await _unitOfWork.SaveChangesAsync();
+    }
 
 
 
-    //public async Task AsignarRolAsync(Guid usuarioId, Guid rolId, Guid? subRolId = null)
-    //{
-    //    1.Validar que el usuario exista
-    //    var usuario = await _usuarioRepository.ObtenerPorIdAsync(usuarioId);
-
-    //    if (usuario is null)
-    //        throw new Exception("El usuario no existe.");
-
-    //    2.Validar que el rol exista
-    //    var rolExiste = await _context.Roles
-    //        .AnyAsync(r => r.Id == rolId);
-
-    //    if (!rolExiste)
-    //        throw new Exception("El rol no existe.");
-
-    //    3.Validación de dominio(REGLA IMPORTANTE)
-    //    if (subRolId.HasValue)
-    //    {
-    //        var subRol = await _context.SubRoles
-    //            .FirstOrDefaultAsync(sr => sr.Id == subRolId.Value);
-
-    //        if (subRol is null)
-    //            throw new Exception("El sub-rol no existe.");
-
-    //        if (subRol.RolId != rolId)
-    //            throw new Exception("El sub-rol no pertenece al rol seleccionado.");
-    //    }
-
-    //    4.Ejecutar actualización(repo)
-    //    await _usuarioRepository.AsignarRolAsync(usuarioId, rolId, subRolId);
-    //}
-
-
-
-
-
-
-
-
-
-
-
-    //// =========================================================
-    //// 2. OBTENER INACTIVOS
-    //// =========================================================
-    //public async Task<PaginatedResult<UsuarioDto>> ObtenerInactivosAsync(
-    //    PaginationRequest pagination)
-    //{
-    //    var resultado =
-    //        await _usuarioRepository.ObtenerTodosAsync(pagination, false);
-
-    //    return new PaginatedResult<UsuarioDto>
-    //    {
-    //        Items = resultado.Items.Select(u => new UsuarioDto
-    //        {
-    //            Id = u.Id,
-    //            Nombre = u.Nombre,
-    //            Correo = u.Correo,
-    //            Activo = u.Activo,
-    //            CorreoVerificado = u.CorreoVerificado,
-    //            Rol = u.Rol?.Nombre,
-    //            SubRol = u.SubRol?.Nombre,
-    //            UltimoAcceso = u.UltimoAcceso
-    //        }).ToList(),
-
-    //        PageNumber = resultado.PageNumber,
-    //        PageSize = resultado.PageSize,
-    //        TotalRecords = resultado.TotalRecords,
-    //        TotalPages = resultado.TotalPages,
-    //        HasPreviousPage = resultado.HasPreviousPage,
-    //        HasNextPage = resultado.HasNextPage
-    //    };
-    //}
-
-    //// =========================================================
-    //// 3. OBTENER POR ID
-    //// =========================================================
-    //public async Task<UsuarioDto> ObtenerPorIdAsync(Guid id)
-    //{
-    //    var usuario = await _usuarioRepository.ObtenerPorIdConRolAsync(id);
-
-    //    if (usuario is null)
-    //        throw new NotFoundException("Usuario no encontrado.");
-
-    //    return new UsuarioDto
-    //    {
-    //        Id = usuario.Id,
-    //        Nombre = usuario.Nombre,
-    //        Correo = usuario.Correo,
-    //        Activo = usuario.Activo,
-    //        CorreoVerificado = usuario.CorreoVerificado,
-    //        Rol = usuario.Rol?.Nombre,
-    //        SubRol = usuario.SubRol?.Nombre,
-    //        UltimoAcceso = usuario.UltimoAcceso
-    //    };
-    //}
-
-    //// =========================================================
-    //// 4. PATCH UPDATE (UPDERT SOLO CAMPOS EDITABLES)
-    //// =========================================================
-    //public async Task ActualizarAsync(Guid id, ActualizarUsuarioDto dto)
-    //{
-    //    var usuario = await _usuarioRepository.ObtenerPorIdConRolAsync(id);
-
-    //    if (usuario is null)
-    //        throw new NotFoundException("Usuario no encontrado.");
-
-    //    if (!string.IsNullOrWhiteSpace(dto.Nombre))
-    //        usuario.Nombre = dto.Nombre.Trim();
-
-    //    if (!string.IsNullOrWhiteSpace(dto.Correo))
-    //        usuario.Correo = dto.Correo.Trim().ToLower();
-
-    //    if (dto.RolId.HasValue)
-    //        usuario.RolId = dto.RolId;
-
-    //    if (dto.SubRolId.HasValue)
-    //        usuario.SubRolId = dto.SubRolId;
-
-    //    usuario.UpdatedAt = DateTimeOffset.UtcNow;
-
-    //    _usuarioRepository.Actualizar(usuario);
-
-    //    await _unitOfWork.SaveChangesAsync();
-    //}
-
-    //// =========================================================
-    //// 5. CAMBIAR ESTATUS (UPSERT ACTIVO/INACTIVO)
-    //// =========================================================
-    //public async Task CambiarEstatusAsync(Guid id, CambiarEstatusUsuarioDto dto)
-    //{
-    //    var usuario = await _usuarioRepository.ObtenerPorIdAsync(id);
-
-    //    if (usuario is null)
-    //        throw new NotFoundException("Usuario no encontrado.");
-
-    //    usuario.Activo = dto.Activo;
-
-    //    if (!dto.Activo)
-    //        usuario.UltimoAcceso = usuario.UltimoAcceso; // opcional lógica extra
-
-    //    usuario.UpdatedAt = DateTimeOffset.UtcNow;
-
-    //    _usuarioRepository.Actualizar(usuario);
-
-    //    await _unitOfWork.SaveChangesAsync();
-    //}
 }

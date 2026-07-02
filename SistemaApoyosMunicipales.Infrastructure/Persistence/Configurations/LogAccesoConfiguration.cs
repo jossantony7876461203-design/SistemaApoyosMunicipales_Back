@@ -15,7 +15,7 @@ namespace SistemaApoyosMunicipales.Infrastructure.Persistence.Configurations
             builder.HasKey(l => l.Id);
             builder.Property(l => l.Id).HasColumnName("id");
             builder.Property(l => l.UsuarioId).HasColumnName("usuario_id");
-            builder.Property(l => l.Accion).HasColumnName("accion").HasMaxLength(50).IsRequired();
+            builder.Property(l => l.Accion).HasColumnName("accion").HasMaxLength(100).IsRequired();
             builder.Property(l => l.Ip).HasColumnName("ip").HasMaxLength(45);
             builder.Property(l => l.UserAgent).HasColumnName("user_agent");
             builder.Property(l => l.Exitoso).HasColumnName("exitoso").HasDefaultValue(true);

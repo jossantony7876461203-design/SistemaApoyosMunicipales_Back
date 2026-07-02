@@ -1,0 +1,12 @@
+============================================
+SIMULACIÓN DE CORREO - MODO DESARROLLO
+============================================
+Para:      carlos.mendoza@municipio.gob
+Nombre:    Carlos Mendoza Rios
+Fecha:     03/06/2026 21:11:12
+--------------------------------------------
+LINK DE ACTIVACIÓN:
+http://localhost:5173/activar?token=E959A426D5A3B12D3EC7840866779FFDD5DF99F47C16C3267231686A296BFCFB
+--------------------------------------------
+Copia y pega el link en el navegador.
+============================================

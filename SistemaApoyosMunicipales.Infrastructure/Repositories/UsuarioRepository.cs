@@ -98,7 +98,18 @@ namespace SistemaApoyosMunicipales.Infrastructure.Persistence.Repositories
                 .ExecuteUpdateAsync(u => u
                     .SetProperty(x => x.RolId, rolId)
                     .SetProperty(x => x.SubRolId, subRolId)
-                    .SetProperty(x => x.UpdatedAt, DateTime.UtcNow));
+                    .SetProperty(x => x.UpdatedAt, DateTimeOffset.UtcNow));
+        }
+
+        public async Task CambiarEstatusAsync(
+    Guid usuarioId,
+    bool activo)
+        {
+            await _context.Usuarios
+                .Where(u => u.Id == usuarioId)
+                .ExecuteUpdateAsync(u => u
+                    .SetProperty(x => x.Activo, activo)
+                    .SetProperty(x => x.UpdatedAt, DateTimeOffset.UtcNow));
         }
     }
 }

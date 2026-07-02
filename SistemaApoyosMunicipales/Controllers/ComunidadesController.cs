@@ -1,8 +1,9 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using SistemaApoyosMunicipales.Application.Common.Models;
 using SistemaApoyosMunicipales.Application.DTOs.Comunidad;
-using Microsoft.AspNetCore.Authorization;
 using SistemaApoyosMunicipales.Application.Interfaces.Auth;
+using SistemaApoyosMunicipales.Application.Interfaces.Storage;
 
 namespace SistemaApoyosMunicipales.API.Controllers;
 
@@ -11,23 +12,62 @@ namespace SistemaApoyosMunicipales.API.Controllers;
 public sealed class ComunidadesController : ControllerBase
 {
     private readonly IComunidadService _comunidadService;
+    private readonly IImagenQueue _imagenQueue;
 
     public ComunidadesController(
-        IComunidadService comunidadService)
+        IComunidadService comunidadService,
+        IImagenQueue imagenQueue)
     {
         _comunidadService = comunidadService;
+        _comunidadService= comunidadService;
     }
 
+
+    // POST: api/comunidades
     [HttpPost]
-    public async Task<IActionResult> Crear(
-        [FromBody] CrearComunidadDto dto)
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> Crear([FromForm] CrearComunidadDto dto)
     {
-        await _comunidadService.CrearAsync(dto);
+        var tareaId = await _comunidadService.CrearAsync(dto);
 
         return Ok(new
         {
-            Mensaje = "Comunidad creada correctamente."
+            Mensaje = "Comunidad creada correctamente.",
+            TareaId = tareaId,    // null si no había imagen
+            Info = tareaId is not null
+                ? "La imagen se está procesando en segundo plano."
+                : null
         });
+    }
+
+    // GET: api/comunidades/tarea/{tareaId}
+    // El front consulta esto cada X segundos hasta Completada o Fallida
+    [HttpGet("tarea/{tareaId:guid}")]
+    public IActionResult ObtenerEstadoTarea(Guid tareaId)
+    {
+        var tarea = _imagenQueue.ObtenerEstado(tareaId);
+
+        if (tarea is null)
+            return NotFound(new { Mensaje = "Tarea no encontrada." });
+
+        return Ok(new
+        {
+            TareaId = tarea.Id,
+            Estado = tarea.Estado.ToString(),
+            Url = tarea.UrlResultado,
+            Error = tarea.Error
+        });
+    }
+
+    // PATCH: api/comunidades/{id}/ine
+    [HttpPatch("{id:guid}/ine")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> ActualizarIne(
+        Guid id,
+        [FromForm] ActualizarIneDto dto)
+    {
+        await _comunidadService.ActualizarIneAsync(id, dto);
+        return Ok(new { Mensaje = "INE actualizado correctamente." });
     }
 
     [HttpGet]

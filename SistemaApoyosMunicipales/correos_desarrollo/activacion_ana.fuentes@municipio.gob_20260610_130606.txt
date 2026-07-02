@@ -1,0 +1,12 @@
+============================================
+SIMULACIÓN DE CORREO - MODO DESARROLLO
+============================================
+Para:      ana.fuentes@municipio.gob
+Nombre:    Ana Patricia Fuentes
+Fecha:     10/06/2026 13:06:06
+--------------------------------------------
+LINK DE ACTIVACIÓN:
+http://localhost:5173/activar?token=A2A34062E17A0BD2A5C6BA65749C8F551BDB93B6337F3029B3EA884C7BBC27F3
+--------------------------------------------
+Copia y pega el link en el navegador.
+============================================

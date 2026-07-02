@@ -15,6 +15,8 @@ namespace SistemaApoyosMunicipales.Domain.Entities.Comunidad
         public string CodigoPostal { get; set; } = string.Empty;
         public string? Delegado { get; set; }
         public string? TelefonoDelegado { get; set; }
+        public string? DelegadoIneUrl { get; set; }
+        public string? DelegadoInePubId { get; set; }
 
         // 3. Columnas de Control, Auditoría y Soft Delete
         public bool Activo { get; set; } = true;

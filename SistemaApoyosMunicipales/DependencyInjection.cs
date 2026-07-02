@@ -14,6 +14,8 @@ namespace SistemaApoyosMunicipales.API
 
             services.AddSwaggerGen();
 
+
+
             return services;
         }
     }

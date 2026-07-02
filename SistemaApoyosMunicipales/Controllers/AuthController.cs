@@ -62,6 +62,8 @@ public class AuthController : ControllerBase
         return Content(html, "text/html");
     }
 
+
+
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginDto dto)
     {
