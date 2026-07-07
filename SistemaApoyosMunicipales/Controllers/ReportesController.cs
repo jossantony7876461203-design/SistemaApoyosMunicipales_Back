@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using SistemaApoyosMunicipales.Application.DTOs.Reportes;
 using SistemaApoyosMunicipales.Application.Interfaces.Auth;
 
@@ -9,6 +10,7 @@ namespace SistemaApoyosMunicipales.API.Controllers
 {
     [ApiController]
     [Route("api/reportes")]
+    [Authorize]
     public class ReportesController : ControllerBase
     {
         private readonly IReportesService _reportesService;

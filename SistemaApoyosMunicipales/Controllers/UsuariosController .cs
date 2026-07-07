@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using SistemaApoyosMunicipales.Application.Common.Models;
 using SistemaApoyosMunicipales.Application.DTOs.Auth;
 using SistemaApoyosMunicipales.Application.DTOs.Usuario;
@@ -9,6 +10,7 @@ namespace SistemaApoyosMunicipales.API.Controllers;
 
 [ApiController]
 [Route("api/usuarios")]
+[Authorize]
 public sealed class UsuariosController : ControllerBase
 {
     private readonly IUsuarioService _usuarioService;

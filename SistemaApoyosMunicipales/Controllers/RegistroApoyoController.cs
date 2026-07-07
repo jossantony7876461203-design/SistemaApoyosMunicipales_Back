@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using SistemaApoyosMunicipales.Application.Common.Models;
 using SistemaApoyosMunicipales.Application.DTOs.RegistroApoyo;
 
@@ -8,6 +9,7 @@ namespace SistemaApoyosMunicipales.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class RegistroApoyoController : ControllerBase
     {
         private readonly IRegistroApoyoService _registroApoyoService;

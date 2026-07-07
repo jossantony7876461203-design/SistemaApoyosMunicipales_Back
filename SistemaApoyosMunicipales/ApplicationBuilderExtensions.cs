@@ -11,12 +11,12 @@ namespace SistemaApoyosMunicipales.API
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
-
                 app.UseSwaggerUI();
             }
 
             app.UseHttpsRedirection();
 
+            app.UseAuthentication();   // ← FALTABA ESTO
             app.UseAuthorization();
 
             app.MapControllers();

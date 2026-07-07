@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using SistemaApoyosMunicipales.Application.DTOs.RolPermiso;
 using SistemaApoyosMunicipales.Application.Interfaces.Auth;
 
@@ -6,6 +7,7 @@ namespace SistemaApoyosMunicipales.API.Controllers
 {
     [ApiController]
     [Route("api/roles/{rolId:guid}/permisos")]
+    [Authorize]
     public sealed class RolesPermisosController : ControllerBase
     {
         private readonly IRolPermisoService _rolPermisoService;

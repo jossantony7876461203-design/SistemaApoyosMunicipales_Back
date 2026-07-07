@@ -9,17 +9,18 @@ namespace SistemaApoyosMunicipales.API.Controllers;
 
 [ApiController]
 [Route("api/comunidades")]
+[Authorize]
 public sealed class ComunidadesController : ControllerBase
 {
     private readonly IComunidadService _comunidadService;
     private readonly IImagenQueue _imagenQueue;
 
     public ComunidadesController(
-        IComunidadService comunidadService,
-        IImagenQueue imagenQueue)
+     IComunidadService comunidadService,
+     IImagenQueue imagenQueue)
     {
         _comunidadService = comunidadService;
-        _comunidadService= comunidadService;
+        _imagenQueue = imagenQueue;
     }
 
 
