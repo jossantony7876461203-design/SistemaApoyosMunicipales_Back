@@ -14,5 +14,6 @@ namespace SistemaApoyosMunicipales.Application.DTOs.RegistroApoyo
 
         public string TipoDocumento { get; set; } = string.Empty;
         public decimal Monto { get; set; }
+        public string? Descripcion { get; set; }
     }
 }

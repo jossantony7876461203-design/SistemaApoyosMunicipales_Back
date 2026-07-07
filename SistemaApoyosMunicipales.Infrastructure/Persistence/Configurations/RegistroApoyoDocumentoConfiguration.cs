@@ -47,6 +47,10 @@ namespace SistemaApoyosMunicipales.Infrastructure.Persistence.Configurations
                 .HasColumnName("created_at")
                 .HasDefaultValueSql("NOW()");
 
+            builder.Property(x => x.Descripcion)
+                 .HasColumnName("descripcion")
+    .HasMaxLength(500);
+
             builder.Property(x => x.Monto)
         .HasColumnName("monto")
         .HasColumnType("numeric(18,2)")

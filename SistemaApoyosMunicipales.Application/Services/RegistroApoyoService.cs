@@ -43,9 +43,8 @@ namespace SistemaApoyosMunicipales.Application.Services
                 EstadoSolicitudId = dto.EstadoSolicitudId,
                 FechaApoyo = dto.FechaApoyo,
                 MontoOtorgado = dto.MontoOtorgado,
-                Observaciones = dto.Observaciones,
+                Observaciones = dto.Observaciones, // nota general del registro (opcional)
 
-                // AUDITORÍA
                 RegistradoPor = usuarioId,
 
                 Activo = true,
@@ -61,15 +60,14 @@ namespace SistemaApoyosMunicipales.Application.Services
                     registro.Id,
                     dto.Archivos,
                     dto.Montos,
-                    dto.TiposDocumento);
+                    dto.TiposDocumento,
+                    dto.Descripciones); // 🔥 descripción individual por factura
 
                 foreach (var doc in documentos)
                     registro.Documentos.Add(doc);
             }
 
             await _registroRepository.AgregarAsync(registro);
-
-            // Un único SaveChangesAsync: inserta el registro y sus documentos juntos.
             await _unitOfWork.SaveChangesAsync();
 
             return registro.Id;
@@ -94,36 +92,35 @@ namespace SistemaApoyosMunicipales.Application.Services
             registro.Observaciones = dto.Observaciones;
             registro.UpdatedAt = DateTimeOffset.UtcNow;
 
-            // 🔥 MODIFICADO: Manejar documentos sin conflicto de concurrencia
+            // Manejar documentos sin conflicto de concurrencia
             var publicIdsAEliminar = new List<string>();
 
             if (dto.Archivos?.Count > 0)
             {
-                // Obtener documentos actuales para eliminar de Cloudinary después
                 var documentosActuales = await _registroRepository.ObtenerDocumentosAsync(id);
                 publicIdsAEliminar = documentosActuales.Select(x => x.PublicId).ToList();
 
-                // ELIMINAR documentos viejos de la BD (directamente, sin tocar registro)
                 await _registroRepository.EliminarDocumentosAsync(id);
 
-                // SUBIR y GUARDAR nuevos documentos
                 var nuevosDocumentos = await SubirDocumentosAsync(
                     id,
                     dto.Archivos,
                     dto.Montos,
-                    dto.TiposDocumento);
+                    dto.TiposDocumento,
+                    dto.Descripciones); // 🔥 descripción individual por factura
 
                 await _registroRepository.AgregarDocumentosAsync(nuevosDocumentos);
             }
 
-            // Solo guardar el registro actualizado
             await _unitOfWork.SaveChangesAsync();
 
-            // Eliminar de Cloudinary después de confirmar la BD
             foreach (var publicId in publicIdsAEliminar)
                 await _cloudinaryService.EliminarImagenAsync(publicId);
         }
 
+        // =========================
+        // OBTENER POR ID
+        // =========================
         public async Task<ObtenerRegistroApoyoDto> ObtenerPorIdAsync(Guid id)
         {
             var registro = await _registroRepository.ObtenerPorIdAsync(id);
@@ -152,7 +149,9 @@ namespace SistemaApoyosMunicipales.Application.Services
                         Id = d.Id,
                         NombreArchivo = d.NombreArchivo,
                         Url = d.Url,
-                        TipoDocumento = d.TipoDocumento
+                        TipoDocumento = d.TipoDocumento,
+                        Monto = d.Monto,
+                        Descripcion = d.Descripcion // 🔥 antes faltaba aquí
                     })
                     .ToList() ?? new List<RegistroApoyoDocumentoDto>()
             };
@@ -191,40 +190,44 @@ namespace SistemaApoyosMunicipales.Application.Services
             await _unitOfWork.SaveChangesAsync();
         }
 
+        // =========================
+        // AGREGAR DOCUMENTOS (sin tocar el registro)
+        // =========================
         public async Task<List<RegistroApoyoDocumentoDto>> AgregarDocumentosAsync(
-         Guid id,
-         AgregarDocumentosRegistroApoyoDto dto)
+            Guid id,
+            AgregarDocumentosRegistroApoyoDto dto)
         {
-            // 1. Verificar que el registro existe (solo lectura ligera)
             var existe = await _registroRepository.ExisteAsync(id);
             if (!existe)
                 throw new NotFoundException("El registro de apoyo no existe.");
 
-            // 2. Validar que hay archivos
             if (dto.Archivos is null || dto.Archivos.Count == 0)
                 throw new BadRequestException("Debes adjuntar al menos un archivo.");
 
-            // 3. Subir documentos a Cloudinary
             var nuevosDocumentos = await SubirDocumentosAsync(
                 id,
                 dto.Archivos,
                 dto.Montos,
-                dto.TiposDocumento);
+                dto.TiposDocumento,
+                dto.Descripciones); // 🔥 descripción individual por factura
 
-            // 4. Guardar documentos DIRECTAMENTE en su tabla (sin tocar el registro)
             await _registroRepository.AgregarDocumentosAsync(nuevosDocumentos);
             await _unitOfWork.SaveChangesAsync();
 
-            // 5. Retornar respuesta
             return nuevosDocumentos.Select(d => new RegistroApoyoDocumentoDto
             {
                 Id = d.Id,
                 NombreArchivo = d.NombreArchivo,
                 Url = d.Url,
                 TipoDocumento = d.TipoDocumento,
-                Monto = d.Monto
+                Monto = d.Monto,
+                Descripcion = d.Descripcion
             }).ToList();
         }
+
+        // =========================
+        // DETALLE
+        // =========================
         public async Task<ObtenerRegistroApoyoDetalleDto> ObtenerDetalleAsync(Guid id)
         {
             var registro = await _registroRepository.ObtenerPorIdAsync(id);
@@ -235,7 +238,7 @@ namespace SistemaApoyosMunicipales.Application.Services
             return new ObtenerRegistroApoyoDetalleDto
             {
                 Id = registro.Id,
-                Descripcion = registro.Observaciones,
+                Descripcion = registro.Observaciones, // nota general (a nivel registro)
                 Delegado = registro.Comunidad?.Delegado,
                 Estatus = registro.EstadoSolicitud?.Nombre,
 
@@ -246,7 +249,8 @@ namespace SistemaApoyosMunicipales.Application.Services
                         NombreArchivo = d.NombreArchivo,
                         Url = d.Url,
                         TipoDocumento = d.TipoDocumento,
-                        Monto = d.Monto
+                        Monto = d.Monto,
+                        Descripcion = d.Descripcion 
                     })
                     .ToList() ?? new List<RegistroApoyoDocumentoDetalleDto>()
             };
@@ -290,16 +294,21 @@ namespace SistemaApoyosMunicipales.Application.Services
         }
 
         // =========================
-        // DOCUMENTOS
+        // DOCUMENTOS (subida a Cloudinary)
         // =========================
         private static readonly HashSet<string> TiposDocumentoValidos =
             new(StringComparer.OrdinalIgnoreCase) { "imagen", "factura", "otro" };
 
+        /// <summary>
+        /// Sube archivos a Cloudinary y arma la entidad RegistroApoyoDocumento
+        /// con su propio monto, tipo y descripción (emparejados por índice).
+        /// </summary>
         private async Task<List<RegistroApoyoDocumento>> SubirDocumentosAsync(
             Guid registroId,
             List<IFormFile> archivos,
             List<decimal>? montos,
-            List<string>? tiposDocumento)
+            List<string>? tiposDocumento,
+            List<string>? descripciones) // 🔥 nueva lista paralela a Montos/TiposDocumento
         {
             // Validamos ANTES de subir nada a Cloudinary, para no
             // gastar uploads si el request va a fallar de todos modos.
@@ -315,9 +324,8 @@ namespace SistemaApoyosMunicipales.Application.Services
 
             var documentos = new List<RegistroApoyoDocumento>();
 
-            // Convertimos a array para poder acceder por índice de forma segura,
-            // ya que Chunk(3) hace los lotes pero necesitamos el índice ORIGINAL
-            // de cada archivo para emparejarlo con su monto/tipo correspondiente.
+            // Índice ORIGINAL de cada archivo, necesario para emparejar
+            // con su monto/tipo/descripción correspondiente tras el Chunk(3).
             var archivosIndexados = archivos
                 .Select((archivo, index) => (archivo, index))
                 .ToList();
@@ -343,6 +351,12 @@ namespace SistemaApoyosMunicipales.Application.Services
                         ? tiposDocumento[index].ToLowerInvariant()
                         : "factura";
 
+                    // 🔥 Descripción propia de ESTA factura (reemplaza el uso
+                    // genérico que antes tenía "observaciones" del registro).
+                    var descripcion = descripciones != null && index < descripciones.Count
+                        ? descripciones[index]
+                        : null;
+
                     return new RegistroApoyoDocumento
                     {
                         Id = Guid.NewGuid(),
@@ -350,6 +364,7 @@ namespace SistemaApoyosMunicipales.Application.Services
                         NombreArchivo = archivo.FileName,
                         TipoDocumento = tipo,
                         Monto = monto,
+                        Descripcion = descripcion,
                         Url = resultado.Url,
                         PublicId = resultado.PublicId,
                         CreatedAt = DateTimeOffset.UtcNow

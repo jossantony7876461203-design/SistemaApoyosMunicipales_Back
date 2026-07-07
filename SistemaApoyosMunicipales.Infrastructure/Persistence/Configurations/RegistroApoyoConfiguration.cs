@@ -68,6 +68,7 @@ namespace SistemaApoyosMunicipales.Infrastructure.Persistence.Configurations
                 .HasColumnName("updated_at")
                 .HasDefaultValueSql("NOW()");
 
+
             // ── Relaciones ──────────────────────────────────────
 
             builder.HasOne(x => x.Apoyo)

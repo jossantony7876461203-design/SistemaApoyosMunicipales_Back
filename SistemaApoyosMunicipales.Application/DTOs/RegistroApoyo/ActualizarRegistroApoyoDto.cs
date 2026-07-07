@@ -20,6 +20,7 @@ namespace SistemaApoyosMunicipales.Application.DTOs.RegistroApoyo
 
         /// <summary>Monto de cada documento (mismo índice que Archivos).</summary>
         public List<decimal>? Montos { get; set; }
+        public List<string>? Descripciones { get; set; }
 
         /// <summary>Tipo de cada documento (opcional, mismo índice que Archivos).</summary>
         public List<string>? TiposDocumento { get; set; }

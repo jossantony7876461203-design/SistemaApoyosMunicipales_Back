@@ -15,6 +15,7 @@ namespace SistemaApoyosMunicipales.Domain.Entities.Documentos
         public string Url { get; set; } = string.Empty;
         public string PublicId { get; set; } = string.Empty;
         public decimal Monto { get; set; }
+        public string? Descripcion { get; set; }
 
         public DateTimeOffset CreatedAt { get; set; }
 

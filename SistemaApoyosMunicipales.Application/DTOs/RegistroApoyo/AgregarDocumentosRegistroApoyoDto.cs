@@ -10,6 +10,8 @@ namespace SistemaApoyosMunicipales.Application.DTOs.RegistroApoyo
     
         public List<IFormFile> Archivos { get; set; } = new();
         public List<decimal>? Montos { get; set; }
+        public List<string>? Descripciones { get; set; }
         public List<string>? TiposDocumento { get; set; }
+
     }
 }
