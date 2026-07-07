@@ -1,19 +1,20 @@
-﻿using QuestPDF.Fluent;
+﻿using Microsoft.Extensions.Options;
+using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using SistemaApoyosMunicipales.Application.DTOs.Reportes;
 using SistemaApoyosMunicipales.Application.Interfaces.Auth;
 using SistemaApoyosMunicipales.Application.Interfaces.Persistence;
+using SistemaApoyosMunicipales.Application.Settings;
 using SistemaApoyosMunicipales.Domain.Exceptions;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
-// Alias explícitos: el proyecto tiene "usings globales implícitos" que
-// traen System.Reflection.Metadata.Document y System.ComponentModel.IContainer,
-// y ambos chocan con los tipos de QuestPDF del mismo nombre.
+// Alias explícitos
 using Document = QuestPDF.Fluent.Document;
 using IContainer = QuestPDF.Infrastructure.IContainer;
 
@@ -22,23 +23,29 @@ namespace SistemaApoyosMunicipales.Application.Services
     public sealed class ReportesService : IReportesService
     {
         private readonly IReportesRepository _reportesRepository;
-
+        private readonly string _rutaLogo;
         private static readonly CultureInfo CulturaMx = new("es-MX");
 
-        public ReportesService(IReportesRepository reportesRepository)
+        // --- CONFIGURACIÓN DE DISEÑO ---
+        private const string ColorVino = "#4B0016";
+        private const string ColorOro = "#c9980b";
+        private const string ColorGrisTexto = "#333333";
+        private const string ColorGrisFondo = "#f8f8f8";
+        private const string ColorFondoCabecera = "#FDFBF7"; // Fondo muy sutil y elegante para la tabla
+        private const string ColorLinea = "#E0E0E0";
+
+        public ReportesService(
+            IReportesRepository reportesRepository,
+            IOptions<ReportesSettings> settings)
         {
             _reportesRepository = reportesRepository;
+            _rutaLogo = settings.Value.RutaLogo;
         }
 
-        // =========================
-        // REPORTE ANUAL / GLOBAL POR COMUNIDADES
-        // =========================
         public async Task<byte[]> GenerarReporteAnualAsync(FiltroReporteDto filtro)
         {
             var (desde, hasta) = CalcularRango(filtro);
-
-            var comunidades = await _reportesRepository.ObtenerResumenPorComunidadAsync(
-                desde, hasta, filtro.ComunidadIds, filtro.ApoyoIds);
+            var comunidades = await _reportesRepository.ObtenerResumenPorComunidadAsync(desde, hasta, filtro.ComunidadIds, filtro.ApoyoIds);
 
             var reporte = new ReporteAnualDto
             {
@@ -47,86 +54,25 @@ namespace SistemaApoyosMunicipales.Application.Services
                 TotalApoyos = comunidades.Sum(c => c.TotalApoyos),
                 TotalDinero = comunidades.Sum(c => c.TotalDinero),
                 TotalComunidades = comunidades.Count,
-                Comunidades = comunidades,
-                Top5MasBeneficiadas = comunidades
-                    .OrderByDescending(c => c.TotalDinero)
-                    .Take(5)
-                    .ToList(),
-                Top5MenosBeneficiadas = comunidades
-                    .OrderBy(c => c.TotalDinero)
-                    .Take(5)
-                    .ToList()
+                Comunidades = comunidades
             };
 
             return GenerarPdfReporteAnual(reporte);
         }
 
-        // =========================
-        // REPORTE POR COMUNIDAD
-        // =========================
-        public async Task<byte[]> GenerarReportePorComunidadAsync(Guid comunidadId, FiltroReporteDto filtro)
-        {
-            var comunidad = await _reportesRepository.ObtenerComunidadAsync(comunidadId);
-
-            if (comunidad is null)
-                throw new NotFoundException("La comunidad no existe.");
-
-            var (desde, hasta) = CalcularRango(filtro);
-
-            var apoyos = await _reportesRepository.ObtenerApoyosDeComunidadAsync(
-                comunidadId, desde, hasta, filtro.ApoyoIds);
-
-            var reporte = new ReportePorComunidadDto
-            {
-                Desde = desde,
-                Hasta = hasta,
-                ComunidadId = comunidadId,
-                Comunidad = comunidad.Value.Comunidad,
-                Delegado = comunidad.Value.Delegado,
-                TotalApoyos = apoyos.Count,
-                TotalDinero = apoyos.Sum(a => a.MontoOtorgado),
-                Apoyos = apoyos
-            };
-
-            return GenerarPdfReportePorComunidad(reporte);
-        }
-
-        // =========================
-        // CÁLCULO DE RANGO DE FECHAS DINÁMICO
-        // =========================
         private static (DateTimeOffset Desde, DateTimeOffset Hasta) CalcularRango(FiltroReporteDto filtro)
         {
-            DateTimeOffset desde;
-            DateTimeOffset hasta;
+            DateTimeOffset desde = filtro.AnioInicio.HasValue
+                ? new DateTimeOffset(filtro.AnioInicio.Value, filtro.MesInicio ?? 1, 1, 0, 0, 0, TimeSpan.Zero)
+                : new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
-            if (filtro.AnioInicio.HasValue)
-            {
-                var mes = filtro.MesInicio ?? 1;
-                desde = new DateTimeOffset(filtro.AnioInicio.Value, mes, 1, 0, 0, 0, TimeSpan.Zero);
-            }
-            else
-            {
-                desde = new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero);
-            }
-
-            if (filtro.AnioFin.HasValue)
-            {
-                var mes = filtro.MesFin ?? 12;
-                var ultimoDiaDelMes = DateTime.DaysInMonth(filtro.AnioFin.Value, mes);
-                hasta = new DateTimeOffset(
-                    filtro.AnioFin.Value, mes, ultimoDiaDelMes, 23, 59, 59, TimeSpan.Zero);
-            }
-            else
-            {
-                hasta = DateTimeOffset.UtcNow;
-            }
+            DateTimeOffset hasta = filtro.AnioFin.HasValue
+                ? new DateTimeOffset(filtro.AnioFin.Value, filtro.MesFin ?? 12, DateTime.DaysInMonth(filtro.AnioFin.Value, filtro.MesFin ?? 12), 23, 59, 59, TimeSpan.Zero)
+                : DateTimeOffset.UtcNow;
 
             return (desde, hasta);
         }
 
-        // =========================
-        // DISEÑO DEL PDF: REPORTE ANUAL - ESTILO GUBERNAMENTAL
-        // =========================
         private byte[] GenerarPdfReporteAnual(ReporteAnualDto reporte)
         {
             return Document.Create(documento =>
@@ -134,379 +80,207 @@ namespace SistemaApoyosMunicipales.Application.Services
                 documento.Page(pagina =>
                 {
                     pagina.Size(PageSizes.A4);
-                    pagina.Margin(40);
-                    pagina.DefaultTextStyle(estilo => estilo.FontSize(10).FontFamily("Arial"));
+                    pagina.Margin(45);
+                    pagina.DefaultTextStyle(x => x.FontSize(10).FontFamily("Arial").FontColor(ColorGrisTexto));
 
-                    // ==================== HEADER GUBERNAMENTAL ====================
-                    pagina.Header().Column(col =>
+                    pagina.Header().Element(c => GenerarCabecera(c, "Reporte Consolidado de Apoyos", reporte.Desde, reporte.Hasta));
+
+                    pagina.Content().PaddingTop(20).Column(col =>
                     {
-                        // Barra superior decorativa
-                        col.Item().Height(4).Background("#C62828");
-
-                        // Logo y título
-                        col.Item().PaddingVertical(8).Row(row =>
+                        col.Item().PaddingBottom(25).Row(row =>
                         {
-                            row.RelativeItem(1).Column(colLogo =>
-                            {
-                                colLogo.Item().Text("GOBIERNO MUNICIPAL")
-                                    .FontSize(8).Bold().FontColor("#1A237E").LetterSpacing(2);
-                                colLogo.Item().Text("Sistema de Apoyos")
-                                    .FontSize(14).Bold().FontColor("#263238");
-                                colLogo.Item().Text("Programa de Desarrollo Comunitario")
-                                    .FontSize(9).FontColor(Colors.Grey.Darken1);
-                            });
-
-                            row.ConstantItem(120).Column(colLogo =>
-                            {
-                                colLogo.Item().AlignRight().Text("REPORTE")
-                                    .FontSize(11).Bold().FontColor("#D32F2F").LetterSpacing(3);
-                                colLogo.Item().AlignRight().Text($"AÑO {reporte.Hasta.Year}")
-                                    .FontSize(18).Bold().FontColor("#C62828");
-                            });
+                            row.AutoItem().Width(4).Background(ColorOro);
+                            row.RelativeItem()
+                               .Background(ColorGrisFondo)
+                               .Padding(15) // Aumentamos padding para que el texto respire
+                               .Text(texto =>
+                               {
+                                   texto.Span("SÍNTESIS EJECUTIVA: ").Bold().FontColor(ColorVino);
+                                   texto.Span("Se documenta la gestión de recursos para ");
+                                   texto.Span(reporte.TotalComunidades.ToString("N0")).Bold();
+                                   texto.Span(" comunidades, con un total de ");
+                                   texto.Span(reporte.TotalApoyos.ToString("N0")).Bold();
+                                   texto.Span(" apoyos y una inversión de ");
+                                   texto.Span(FormatearMoneda(reporte.TotalDinero)).Bold().FontColor(ColorVino);
+                                   texto.Span(".");
+                               });
                         });
 
-                        // Línea decorativa
-                        col.Item().PaddingVertical(5).LineHorizontal(2).LineColor("#D32F2F");
-
-                        // Información del periodo
-                        col.Item().PaddingVertical(3).Row(row =>
-                        {
-                            row.ConstantItem(150).Text("PERIODO:").Bold().FontSize(9);
-                            row.RelativeItem().Text($"{reporte.Desde:dd 'de' MMMM 'de' yyyy} - {reporte.Hasta:dd 'de' MMMM 'de' yyyy}")
-                                .FontSize(9).FontColor(Colors.Grey.Darken2);
-                        });
-
-                        col.Item().PaddingBottom(5).LineHorizontal(1).LineColor(Colors.Grey.Lighten2);
+                        col.Item().PaddingBottom(10).Text("Detalle por Circunscripción").FontSize(11).Bold().FontColor(ColorVino);
+                        col.Item().Element(c => TablaComunidades(c, reporte.Comunidades));
                     });
 
-                    // ==================== CONTENIDO ====================
-                    pagina.Content().PaddingTop(10).Column(col =>
-                    {
-                        // MÉTRICAS PRINCIPALES - Tarjetas mejoradas
-                        col.Item().PaddingBottom(15).Row(fila =>
-                        {
-                            fila.RelativeItem().Padding(3).Element(container =>
-                                TarjetaResumenGubernamental(container, "Total Apoyos", reporte.TotalApoyos.ToString("N0")));
-
-                            fila.RelativeItem().Padding(3).Element(container =>
-                                TarjetaResumenGubernamental(container, "Comunidades", reporte.TotalComunidades.ToString("N0")));
-
-                            fila.RelativeItem().Padding(3).Element(container =>
-                                TarjetaResumenGubernamental(container, "Monto Total", FormatearMoneda(reporte.TotalDinero)));
-                        });
-
-                        // SECCIÓN TOP 5 MÁS BENEFICIADAS
-                        col.Item().PaddingTop(10).PaddingBottom(3).Text("COMUNIDADES MÁS BENEFICIADAS")
-                            .Bold().FontSize(11).FontColor("#1A237E").LetterSpacing(1);
-
-                        col.Item().PaddingBottom(15).Element(c =>
-                            TablaComunidadesMejorada(c, reporte.Top5MasBeneficiadas, true));
-
-                        // SECCIÓN TOP 5 MENOS BENEFICIADAS
-                        col.Item().PaddingTop(5).PaddingBottom(3).Text("COMUNIDADES EN DESARROLLO PRIORITARIO")
-                            .Bold().FontSize(11).FontColor("#1A237E").LetterSpacing(1);
-
-                        col.Item().PaddingBottom(15).Element(c =>
-                            TablaComunidadesMejorada(c, reporte.Top5MenosBeneficiadas, false));
-
-                        // SECCIÓN DETALLE COMPLETO
-                        col.Item().PaddingTop(5).PaddingBottom(3).Text("DETALLE COMPLETO POR COMUNIDAD")
-                            .Bold().FontSize(11).FontColor("#1A237E").LetterSpacing(1);
-
-                        col.Item().Element(c =>
-                            TablaComunidadesMejorada(c, reporte.Comunidades, null));
-                    });
-
-                    // ==================== FOOTER GUBERNAMENTAL ====================
-                    pagina.Footer().Column(col =>
-                    {
-                        col.Item().LineHorizontal(1).LineColor("#D32F2F");
-                        col.Item().PaddingTop(5).Row(row =>
-                        {
-                            row.RelativeItem().Text("Sistema de Apoyos Municipales • Desarrollo Comunitario")
-                                .FontSize(8).FontColor(Colors.Grey.Darken1);
-                            row.ConstantItem(200).AlignRight().Text(texto =>
-                            {
-                                // Configuramos el estilo base para todo este bloque de texto
-                                texto.DefaultTextStyle(x => x.FontSize(8).FontColor(Colors.Grey.Darken1));
-
-                                texto.Span("Página ");
-                                texto.CurrentPageNumber().FontColor("#D32F2F");
-                                texto.Span(" de ");
-                                texto.TotalPages().FontColor("#D32F2F");
-                                texto.Span($" • Generado: {DateTimeOffset.Now:dd/MM/yyyy HH:mm}");
-                            }); // Aquí termina limpiamente
-                        });
-                    });
+                    pagina.Footer().Element(GenerarPiePagina);
                 });
             }).GeneratePdf();
         }
 
-        // =========================
-        // DISEÑO DEL PDF: REPORTE POR COMUNIDAD - ESTILO GUBERNAMENTAL
-        // =========================
-        private byte[] GenerarPdfReportePorComunidad(ReportePorComunidadDto reporte)
+        // --- COMPONENTES ---
+
+        private void GenerarCabecera(IContainer container, string titulo, DateTimeOffset desde, DateTimeOffset hasta)
         {
-            return Document.Create(documento =>
+            // 1. Si por alguna razón el appsettings viene vacío, le ponemos el valor por defecto
+            string rutaRelativa = string.IsNullOrWhiteSpace(_rutaLogo)
+                ? "wwwroot/images/LogoPresidencia.png"
+                : _rutaLogo;
+
+            // 2. Intentamos armar la ruta usando el directorio de ejecución actual (Raíz de la API)
+            string rutaAbsoluta = Path.Combine(Directory.GetCurrentDirectory(), rutaRelativa);
+
+            // 3. Si no existe ahí (a veces pasa en modo Debug), intentamos en la carpeta Bin de compilación
+            if (!File.Exists(rutaAbsoluta))
             {
-                documento.Page(pagina =>
-                {
-                    pagina.Size(PageSizes.A4);
-                    pagina.Margin(40);
-                    pagina.DefaultTextStyle(estilo => estilo.FontSize(10).FontFamily("Arial"));
+                rutaAbsoluta = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, rutaRelativa);
+            }
 
-                    // ==================== HEADER GUBERNAMENTAL ====================
-                    pagina.Header().Column(col =>
-                    {
-                        // Barra superior decorativa
-                        col.Item().Height(4).Background("#C62828");
-
-                        // Título de la comunidad
-                        col.Item().PaddingVertical(8).Row(row =>
-                        {
-                            row.RelativeItem(1).Column(colComunidad =>
-                            {
-                                colComunidad.Item().Text("GOBIERNO MUNICIPAL")
-                                    .FontSize(8).Bold().FontColor("#1A237E").LetterSpacing(2);
-                                colComunidad.Item().Text(reporte.Comunidad)
-                                    .FontSize(16).Bold().FontColor("#263238");
-                                if (!string.IsNullOrWhiteSpace(reporte.Delegado))
-                                {
-                                    colComunidad.Item().Text($"Delegado: {reporte.Delegado}")
-                                        .FontSize(9).FontColor(Colors.Grey.Darken1);
-                                }
-                            });
-
-                            row.ConstantItem(130).Column(colInfo =>
-                            {
-                                colInfo.Item().AlignRight().Text("REPORTE POR COMUNIDAD")
-                                    .FontSize(9).Bold().FontColor("#D32F2F").LetterSpacing(1);
-                                colInfo.Item().AlignRight().Text($"FOLIO: {reporte.ComunidadId.ToString()[..8]}")
-                                    .FontSize(8).FontColor(Colors.Grey.Darken2);
-                            });
-                        });
-
-                        // Línea decorativa
-                        col.Item().PaddingVertical(5).LineHorizontal(2).LineColor("#D32F2F");
-
-                        // Información del periodo
-                        col.Item().PaddingVertical(3).Row(row =>
-                        {
-                            row.ConstantItem(150).Text("PERIODO:").Bold().FontSize(9);
-                            row.RelativeItem().Text($"{reporte.Desde:dd 'de' MMMM 'de' yyyy} - {reporte.Hasta:dd 'de' MMMM 'de' yyyy}")
-                                .FontSize(9).FontColor(Colors.Grey.Darken2);
-                        });
-
-                        col.Item().PaddingBottom(5).LineHorizontal(1).LineColor(Colors.Grey.Lighten2);
-                    });
-
-                    // ==================== CONTENIDO ====================
-                    pagina.Content().PaddingTop(10).Column(col =>
-                    {
-                        // MÉTRICAS PRINCIPALES
-                        col.Item().PaddingBottom(15).Row(fila =>
-                        {
-                            fila.RelativeItem().Padding(3).Element(container =>
-                                TarjetaResumenGubernamental(container, "Total Apoyos", reporte.TotalApoyos.ToString("N0")));
-
-                            fila.RelativeItem().Padding(3).Element(container =>
-                                TarjetaResumenGubernamental(container, "Monto Otorgado", FormatearMoneda(reporte.TotalDinero)));
-                        });
-
-                        // TABLA DE APOYOS
-                        col.Item().PaddingTop(10).PaddingBottom(3).Text("RELACIÓN DE APOYOS OTORGADOS")
-                            .Bold().FontSize(11).FontColor("#1A237E").LetterSpacing(1);
-
-                        col.Item().Element(c => TablaApoyosMejorada(c, reporte.Apoyos));
-
-                        // RESULTADOS Y OBSERVACIONES
-                        col.Item().PaddingTop(20).Row(row =>
-                        {
-                            row.RelativeItem(1).Column(colResumen =>
-                            {
-                                colResumen.Item().Background("#F5F5F5")
-                                    .Border(1).BorderColor(Colors.Grey.Lighten2)
-                                    .Padding(10).Column(colObs =>
-                                    {
-                                        colObs.Item().Text("RESUMEN EJECUTIVO").Bold()
-                                            .FontSize(9).FontColor("#1A237E");
-                                        colObs.Item().PaddingTop(3).Text(
-                                            $"Se otorgaron {reporte.TotalApoyos} apoyos por un monto total de {FormatearMoneda(reporte.TotalDinero)}, " +
-                                            $"beneficiando a la comunidad de {reporte.Comunidad}.")
-                                            .FontSize(8).FontColor(Colors.Grey.Darken2);
-                                    });
-                            });
-
-                            row.ConstantItem(200).Column(colFirma =>
-                            {
-                                colFirma.Item().AlignRight().Text("Vo. Bo. ____________________")
-                                    .FontSize(8).FontColor(Colors.Grey.Darken2);
-                                colFirma.Item().AlignRight().PaddingTop(2).Text(reporte.Delegado ?? "Delegado Municipal")
-                                    .FontSize(9).Bold().FontColor("#263238");
-                                colFirma.Item().AlignRight().Text("Comunidad: " + reporte.Comunidad)
-                                    .FontSize(8).FontColor(Colors.Grey.Darken1);
-                            });
-                        });
-                    });
-
-                    // ==================== FOOTER GUBERNAMENTAL ====================
-                    pagina.Footer().Column(col =>
-                    {
-                        col.Item().LineHorizontal(1).LineColor("#D32F2F");
-                        col.Item().PaddingTop(5).Row(row =>
-                        {
-                            row.RelativeItem().Text("Sistema de Apoyos Municipales • Desarrollo Comunitario")
-                                .FontSize(8).FontColor(Colors.Grey.Darken1);
-
-                            row.ConstantItem(200).AlignRight().Text(texto =>
-                            {
-                                // Configuramos el estilo base para todo este bloque de texto
-                                texto.DefaultTextStyle(x => x.FontSize(8).FontColor(Colors.Grey.Darken1));
-
-                                texto.Span("Página ");
-                                texto.CurrentPageNumber().FontColor("#D32F2F");
-                                texto.Span(" de ");
-                                texto.TotalPages().FontColor("#D32F2F");
-                                texto.Span($" • Generado: {DateTimeOffset.Now:dd/MM/yyyy HH:mm}");
-                            }); 
-                        });
-                    });
-                });
-            }).GeneratePdf();
-        }
-
-        // =========================
-        // HELPERS DE DISEÑO REUTILIZABLES - VERSIÓN GUBERNAMENTAL
-        // =========================
-
-        private static void TarjetaResumenGubernamental(IContainer container, string etiqueta, string valor)
-        {
-            container.Background(Colors.White).Border(1).BorderColor(Colors.Grey.Lighten2)
-                .Padding(12).Column(col =>
-                {
-                    col.Item().Text(etiqueta).FontSize(8).FontColor(Colors.Grey.Darken1)
-                        .LetterSpacing(1).Bold();
-                    col.Item().PaddingTop(2).Text(valor).FontSize(18).Bold()
-                        .FontColor("#263238");
-                    col.Item().PaddingTop(3).LineHorizontal(1).LineColor("#D32F2F");
-                });
-        }
-
-        private static void TablaComunidadesMejorada(
-            IContainer contenedor,
-            List<ReporteComunidadResumenDto> comunidades,
-            bool? resaltarPosicion)
-        {
-            contenedor.Table(tabla =>
+            // 4. NUEVO DEBUG REFORZADO: Si sigue sin existir, ahora sí te dirá las rutas reales donde buscó
+            if (!File.Exists(rutaAbsoluta))
             {
-                tabla.ColumnsDefinition(c =>
-                {
-                    if (resaltarPosicion.HasValue)
-                        c.ConstantColumn(25);
-                    c.RelativeColumn(3);
-                    c.RelativeColumn(2);
-                    c.RelativeColumn(1);
-                    c.RelativeColumn(2);
-                });
+                string rutaIntento1 = Path.Combine(Directory.GetCurrentDirectory(), rutaRelativa);
+                string rutaIntento2 = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, rutaRelativa);
 
-                tabla.Header(header =>
-                {
-                    if (resaltarPosicion.HasValue)
-                        CeldaHeaderMejorada(header, "#", true);
-                    CeldaHeaderMejorada(header, "Comunidad", true);
-                    CeldaHeaderMejorada(header, "Delegado", true);
-                    CeldaHeaderMejorada(header, "Apoyos", true);
-                    CeldaHeaderMejorada(header, "Monto", true);
-                });
+                throw new Exception(
+                    $"[ERROR DE LOGO]: El archivo no se encontró.\n" +
+                    $"Valor en appsettings: '{_rutaLogo}'\n" +
+                    $"Ruta intentada 1: '{rutaIntento1}'\n" +
+                    $"Ruta intentada 2: '{rutaIntento2}'\n" +
+                    $"Por favor, verifica en cuál de esas carpetas físicas te falta pegar la carpeta 'wwwroot'."
+                );
+            }
 
-                int posicion = 1;
-                foreach (var c in comunidades)
+            // 5. El diseño de tu cabecera se mantiene intacto y hermoso
+            container.Column(col =>
+            {
+                col.Item().Row(row =>
                 {
-                    string fondoFila = posicion % 2 == 0 ? "#F5F5F5" : Colors.White;
+                    // IZQUIERDA: Logo (Ya garantizado que existe gracias al IF de arriba)
+                    row.ConstantItem(65).Height(65).AlignLeft().Image(rutaAbsoluta);
 
-                    if (resaltarPosicion.HasValue)
+                    // CENTRO: Títulos institucionales
+                    row.RelativeItem().PaddingLeft(15).AlignMiddle().Column(c =>
                     {
-                        if (resaltarPosicion.Value)
-                        {
-                            // Top 5 - colores dorados para primeros lugares
-                            string colorPos = posicion <= 3 ? "#F9A825" : "#FFA500";
-                            tabla.Cell().Background(fondoFila).Padding(4)
-                                .Text(posicion.ToString()).FontColor(colorPos).Bold().FontSize(8);
-                        }
-                        else
-                        {
-                            tabla.Cell().Background(fondoFila).Padding(4)
-                                .Text(posicion.ToString()).FontColor(Colors.Grey.Darken1).FontSize(8);
-                        }
-                        posicion++;
-                    }
+                        c.Item().Text("Tula de Allende Hidalgo").FontSize(13).Bold().FontColor(ColorVino).LetterSpacing(0.3f);
+                        c.Item().Text("Presidencia Municipal 2024-2027").FontSize(9.5f).FontColor(ColorGrisTexto);
+                        c.Item().PaddingTop(2).Text("Sistema de Apoyos Municipales").FontSize(9.5f).Italic().FontColor(ColorGrisTexto);
+                    });
 
-                    tabla.Cell().Background(fondoFila).Padding(4).Text(c.Comunidad).FontSize(9);
-                    tabla.Cell().Background(fondoFila).Padding(4).Text(c.Delegado ?? "-").FontSize(9);
-                    tabla.Cell().Background(fondoFila).Padding(4).Text(c.TotalApoyos.ToString("N0"))
-                        .FontColor("#D32F2F").Bold().FontSize(9);
-                    tabla.Cell().Background(fondoFila).Padding(4).Text(FormatearMoneda(c.TotalDinero))
-                        .FontColor("#1A237E").FontSize(9);
-                }
+                    // DERECHA: Periodo
+                    row.ConstantItem(130).AlignRight().AlignMiddle().Column(c =>
+                    {
+                        c.Item().AlignRight().Text("PERIODO").FontSize(7.5f).Bold().FontColor(ColorOro).LetterSpacing(0.5f);
+                        c.Item().AlignRight().Text($"{desde:dd/MM/yyyy} - {hasta:dd/MM/yyyy}").FontSize(9.5f);
+                    });
+                });
+
+                col.Item().PaddingTop(12).LineHorizontal(1.5f).LineColor(ColorVino);
+                col.Item().PaddingTop(8).AlignCenter().Text(titulo.ToUpper()).FontSize(12).Bold().FontColor(ColorVino).LetterSpacing(0.5f);
             });
         }
-
-        private static void TablaApoyosMejorada(
-            IContainer contenedor,
-            List<ReporteApoyoDetalleDto> apoyos)
+        private static void TablaComunidades(IContainer contenedor, List<ReporteComunidadResumenDto> comunidades)
         {
             contenedor.Table(tabla =>
             {
                 tabla.ColumnsDefinition(c =>
                 {
+                    c.RelativeColumn(3f);   // Más espacio para circunscripción
+                    c.RelativeColumn(4f);   // Mucho más espacio para nombres de delegados largos
                     c.RelativeColumn(1.5f);
                     c.RelativeColumn(2.5f);
-                    c.RelativeColumn(1.5f);
-                    c.RelativeColumn(1.5f);
-                    c.RelativeColumn(1.5f);
-                    c.RelativeColumn(1.5f);
                 });
 
                 tabla.Header(header =>
                 {
-                    CeldaHeaderMejorada(header, "Folio", true);
-                    CeldaHeaderMejorada(header, "Fondo", true);
-                    CeldaHeaderMejorada(header, "Fecha", true);
-                    CeldaHeaderMejorada(header, "Monto", true);
-                    CeldaHeaderMejorada(header, "Estado", true);
-                    CeldaHeaderMejorada(header, "Beneficiario", true);
+                    CeldaHeader(header, "Circunscripción");
+                    CeldaHeader(header, "Gestión Local / Delegado");
+                    CeldaHeader(header, "Movimientos", alinearDerecha: true);
+                    CeldaHeader(header, "Total Otorgado", alinearDerecha: true);
                 });
 
-                int fila = 0;
-                foreach (var apoyo in apoyos)
+                foreach (var c in comunidades)
                 {
-                    string fondoFila = fila % 2 == 0 ? "#F5F5F5" : Colors.White;
-
-                    tabla.Cell().Background(fondoFila).Padding(4).Text(apoyo.Folio).FontSize(8);
-                    tabla.Cell().Background(fondoFila).Padding(4).Text(apoyo.Fondo).FontSize(8);
-                    tabla.Cell().Background(fondoFila).Padding(4).Text(apoyo.FechaApoyo.ToString("dd/MM/yyyy")).FontSize(8);
-                    tabla.Cell().Background(fondoFila).Padding(4).Text(FormatearMoneda(apoyo.MontoOtorgado))
-                        .FontColor("#1A237E").FontSize(8);
-                    tabla.Cell().Background(fondoFila).Padding(4).Text(apoyo.Estado)
-                        .FontColor(apoyo.Estado == "Aprobado" ? "#1B5E20" : "#E65100")
-                        .FontSize(8).Bold();
-                    
-
-                    fila++;
+                    tabla.Cell().Element(CeldaEstilo).Text(c.Comunidad).FontSize(9);
+                    tabla.Cell().Element(CeldaEstilo).Text(c.Delegado ?? "-").FontSize(9);
+                    tabla.Cell().Element(CeldaEstilo).AlignRight().Text(c.TotalApoyos.ToString("N0")).FontSize(9);
+                    tabla.Cell().Element(CeldaEstilo).AlignRight().Text(FormatearMoneda(c.TotalDinero)).FontSize(9).Bold().FontColor(ColorVino);
                 }
             });
         }
 
-        private static void CeldaHeaderMejorada(TableCellDescriptor header, string texto, bool principal)
+        private static void CeldaHeader(TableCellDescriptor header, string texto, bool alinearDerecha = false)
         {
-            header.Cell().Background("#C62828").Padding(6)
-                .Text(texto).FontColor(Colors.White).Bold().FontSize(8)
-                .LetterSpacing(principal ? 1 : 0);
+            // Se añade un fondo muy sutil y padding lateral para el "leve diseño"
+            var contenedor = header.Cell()
+                .Background(ColorFondoCabecera)
+                .PaddingHorizontal(5)
+                .PaddingVertical(10)
+                .BorderBottom(1.5f)
+                .BorderColor(ColorVino);
+
+            if (alinearDerecha) contenedor = contenedor.AlignRight();
+            else contenedor = contenedor.AlignLeft();
+
+            contenedor.Text(texto).FontSize(9f).Bold().FontColor(ColorVino);
         }
 
-        private static string FormatearMoneda(decimal monto)
+        private static IContainer CeldaEstilo(IContainer container)
         {
-            return monto.ToString("C2", CulturaMx);
+            // Agregado un poco de PaddingHorizontal para que el texto no toque la línea imaginaria de la columna
+            return container.BorderBottom(0.5f).BorderColor(ColorLinea).PaddingHorizontal(5).PaddingVertical(8).AlignMiddle();
+        }
+
+        private static void GenerarPiePagina(IContainer container)
+        {
+            container.PaddingTop(10).BorderTop(0.5f).BorderColor(ColorLinea).Row(row =>
+            {
+                row.RelativeItem().Text("Presidencia de Tula de Allende Hidalgo 2024-2027").FontSize(7.5f).Italic();
+                row.ConstantItem(100).AlignRight().Text(x =>
+                {
+                    x.Span("Página ").FontSize(7.5f);
+                    x.CurrentPageNumber().FontSize(7.5f);
+                });
+            });
+        }
+
+        private static string FormatearMoneda(decimal monto) => monto.ToString("C2", CulturaMx);
+
+        // REPORTE POR COMUNIDAD
+        public async Task<byte[]> GenerarReportePorComunidadAsync(Guid comunidadId, FiltroReporteDto filtro)
+        {
+            var comunidad = await _reportesRepository.ObtenerComunidadAsync(comunidadId);
+            if (comunidad is null) throw new NotFoundException("Comunidad no encontrada");
+
+            var (desde, hasta) = CalcularRango(filtro);
+            var apoyos = await _reportesRepository.ObtenerApoyosDeComunidadAsync(comunidadId, desde, hasta, filtro.ApoyoIds);
+
+            return Document.Create(doc =>
+            {
+                doc.Page(p =>
+                {
+                    p.Size(PageSizes.A4); p.Margin(45);
+                    p.Header().Element(c => GenerarCabecera(c, $"Informe: {comunidad.Value.Comunidad}", desde, hasta));
+                    p.Content().PaddingTop(20).Column(col =>
+                    {
+                        col.Item().PaddingBottom(15).Text($"Relación de apoyos para {comunidad.Value.Comunidad}").Bold().FontColor(ColorVino);
+                        col.Item().Table(t =>
+                        {
+                            t.ColumnsDefinition(c => {
+                                c.RelativeColumn(1.5f); c.RelativeColumn(3f); c.RelativeColumn(1.5f); c.RelativeColumn(2.5f);
+                            });
+                            t.Header(h => {
+                                CeldaHeader(h, "Folio"); CeldaHeader(h, "Fondo"); CeldaHeader(h, "Fecha"); CeldaHeader(h, "Monto", true);
+                            });
+                            foreach (var a in apoyos)
+                            {
+                                t.Cell().Element(CeldaEstilo).Text(a.Folio).FontSize(8.5f);
+                                t.Cell().Element(CeldaEstilo).Text(a.Fondo).FontSize(8.5f);
+                                t.Cell().Element(CeldaEstilo).Text(a.FechaApoyo.ToString("dd/MM/yyyy")).FontSize(8.5f);
+                                t.Cell().Element(CeldaEstilo).AlignRight().Text(FormatearMoneda(a.MontoOtorgado)).FontSize(8.5f).Bold().FontColor(ColorVino);
+                            }
+                        });
+                    });
+                    p.Footer().Element(GenerarPiePagina);
+                });
+            }).GeneratePdf();
         }
     }
 }

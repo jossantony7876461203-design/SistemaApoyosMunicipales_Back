@@ -16,6 +16,7 @@ namespace SistemaApoyosMunicipales.API
             IConfiguration configuration   // <-- AGREGADO: sin esto, "configuration" no existe
         )
         {
+
             services.AddControllers();
 
             services.AddEndpointsApiExplorer();

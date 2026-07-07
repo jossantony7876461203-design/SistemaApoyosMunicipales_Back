@@ -10,7 +10,7 @@ namespace SistemaApoyosMunicipales.API.Controllers
 {
     [ApiController]
     [Route("api/reportes")]
-    [Authorize]
+    //[Authorize]
     public class ReportesController : ControllerBase
     {
         private readonly IReportesService _reportesService;
