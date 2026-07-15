@@ -2,8 +2,8 @@
 using Microsoft.AspNetCore.Mvc;
 using SistemaApoyosMunicipales.Application.Common.Models;
 using SistemaApoyosMunicipales.Application.DTOs.RegistroApoyo;
-
 using SistemaApoyosMunicipales.Application.Interfaces.Auth;
+using SistemaApoyosMunicipales.Domain.Exceptions;
 
 namespace SistemaApoyosMunicipales.API.Controllers
 {
@@ -15,9 +15,6 @@ namespace SistemaApoyosMunicipales.API.Controllers
         private readonly IRegistroApoyoService _registroApoyoService;
         private readonly ICurrentUserService _currentUser;
 
-        // GUID default para cuando no hay usuario autenticado
-        private static readonly Guid DefaultUserId = Guid.Parse("11111111-1111-1111-1111-111111111111");
-
         public RegistroApoyoController(
             IRegistroApoyoService registroApoyoService,
             ICurrentUserService currentUser)
@@ -26,87 +23,136 @@ namespace SistemaApoyosMunicipales.API.Controllers
             _currentUser = currentUser;
         }
 
-        /// <summary>
-        /// Obtiene el ID del usuario autenticado o el default si no existe
-        /// </summary>
         private Guid GetUsuarioId()
         {
-            // Si hay usuario autenticado, usar ese
-            if (_currentUser.UserId.HasValue)
+            if (_currentUser.UserId.HasValue &&
+                _currentUser.UserId.Value != Guid.Empty)
+            {
                 return _currentUser.UserId.Value;
+            }
 
-            // Si no, usar el default
-            return DefaultUserId;
+            throw new UnauthorizedException(
+                "No se pudo identificar al usuario autenticado.");
         }
 
         [HttpPost]
-        public async Task<ActionResult<Guid>> Crear([FromForm] CrearRegistroApoyoDto dto)
+        public async Task<ActionResult<Guid>> Crear(
+            [FromForm] CrearRegistroApoyoDto dto)
         {
             var usuarioId = GetUsuarioId();
-            var id = await _registroApoyoService.CrearAsync(dto, usuarioId);
-            return CreatedAtAction(nameof(ObtenerPorId), new { id }, id);
+
+            var id = await _registroApoyoService.CrearAsync(
+                dto,
+                usuarioId);
+
+            return CreatedAtAction(
+                nameof(ObtenerPorId),
+                new { id },
+                id);
         }
 
-        [HttpGet("{id}")]
-        public async Task<ActionResult<ObtenerRegistroApoyoDto>> ObtenerPorId(Guid id)
+        [HttpGet]
+        public async Task<
+            ActionResult<PaginatedResult<ObtenerRegistroApoyoGlobalDto>>>
+            ObtenerTodos(
+                [FromQuery] PaginationRequest pagination)
         {
-            var registro = await _registroApoyoService.ObtenerPorIdAsync(id);
+            var resultado = await _registroApoyoService
+                .ObtenerTodosAsync(pagination);
+
+            return Ok(resultado);
+        }
+
+        [HttpGet("estados-solicitud")]
+        public async Task<
+            ActionResult<List<EstadoSolicitudCatalogoDto>>>
+            ObtenerEstadosSolicitud()
+        {
+            var estados = await _registroApoyoService
+                .ObtenerEstadosSolicitudAsync();
+
+            return Ok(estados);
+        }
+
+        [HttpGet("comunidad/{comunidadId:guid}")]
+        public async Task<
+            ActionResult<
+                PaginatedResult<ObtenerRegistroApoyoListadoDto>>>
+            ObtenerPorComunidad(
+                Guid comunidadId,
+                [FromQuery] PaginationRequest pagination)
+        {
+            var resultado = await _registroApoyoService
+                .ObtenerPorComunidadAsync(
+                    comunidadId,
+                    pagination);
+
+            return Ok(resultado);
+        }
+
+        [HttpGet("{id:guid}")]
+        public async Task<ActionResult<ObtenerRegistroApoyoDto>>
+            ObtenerPorId(Guid id)
+        {
+            var registro = await _registroApoyoService
+                .ObtenerPorIdAsync(id);
+
             return Ok(registro);
         }
 
-        [HttpGet("comunidad/{comunidadId}")]
-        public async Task<ActionResult<PaginatedResult<ObtenerRegistroApoyoListadoDto>>>
-            ObtenerPorComunidad(Guid comunidadId, [FromQuery] PaginationRequest pagination)
+        [HttpGet("{id:guid}/detalle")]
+        public async Task<ActionResult<ObtenerRegistroApoyoDetalleDto>>
+            ObtenerDetalle(Guid id)
         {
-            var resultado = await _registroApoyoService.ObtenerPorComunidadAsync(comunidadId, pagination);
-            return Ok(resultado);
-        }
+            var detalle = await _registroApoyoService
+                .ObtenerDetalleAsync(id);
 
-        [HttpPut("{id}")]
-        public async Task<IActionResult> Actualizar(Guid id, [FromForm] ActualizarRegistroApoyoDto dto)
-        {
-            await _registroApoyoService.ActualizarAsync(id, dto);
-            return NoContent();
-        }
-
-        [HttpPatch("{id}/estado")]
-        public async Task<IActionResult> CambiarEstado(Guid id, [FromBody] CambiarEstadoRegistroApoyoDto dto)
-        {
-            await _registroApoyoService.CambiarEstadoAsync(id, dto.EstadoSolicitudId);
-            return NoContent();
-        }
-
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> Eliminar(Guid id)
-        {
-            await _registroApoyoService.EliminarAsync(id);
-            return NoContent();
-        }
-
-
-
-        [HttpGet]
-        public async Task<ActionResult<PaginatedResult<ObtenerRegistroApoyoGlobalDto>>>
-            ObtenerTodos([FromQuery] PaginationRequest pagination)
-        {
-            var resultado = await _registroApoyoService.ObtenerTodosAsync(pagination);
-            return Ok(resultado);
-        }
-
-        [HttpGet("{id}/detalle")]
-        public async Task<ActionResult<ObtenerRegistroApoyoDetalleDto>> ObtenerDetalle(Guid id)
-        {
-            var detalle = await _registroApoyoService.ObtenerDetalleAsync(id);
             return Ok(detalle);
         }
 
-        [HttpPost("{id}/documentos")]
-        public async Task<ActionResult<List<RegistroApoyoDocumentoDto>>> AgregarDocumentos(
-    Guid id,
-    [FromForm] AgregarDocumentosRegistroApoyoDto dto)
+        [HttpPut("{id:guid}")]
+        public async Task<IActionResult> Actualizar(
+            Guid id,
+            [FromForm] ActualizarRegistroApoyoDto dto)
         {
-            var documentos = await _registroApoyoService.AgregarDocumentosAsync(id, dto);
+            await _registroApoyoService.ActualizarAsync(
+                id,
+                dto);
+
+            return NoContent();
+        }
+
+        [HttpPatch("{id:guid}/estado")]
+        public async Task<IActionResult> CambiarEstado(
+            Guid id,
+            [FromBody] CambiarEstadoRegistroApoyoDto dto)
+        {
+            await _registroApoyoService.CambiarEstadoAsync(
+                id,
+                dto.EstadoSolicitudId);
+
+            return NoContent();
+        }
+
+        [HttpPost("{id:guid}/documentos")]
+        public async Task<
+            ActionResult<List<RegistroApoyoDocumentoDto>>>
+            AgregarDocumentos(
+                Guid id,
+                [FromForm] AgregarDocumentosRegistroApoyoDto dto)
+        {
+            var documentos = await _registroApoyoService
+                .AgregarDocumentosAsync(id, dto);
+
             return Ok(documentos);
+        }
+
+        [HttpDelete("{id:guid}")]
+        public async Task<IActionResult> Eliminar(Guid id)
+        {
+            await _registroApoyoService.EliminarAsync(id);
+
+            return NoContent();
         }
     }
 }

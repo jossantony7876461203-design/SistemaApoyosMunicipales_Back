@@ -4,15 +4,13 @@ using SistemaApoyosMunicipales.Application.Interfaces.Persistence;
 using SistemaApoyosMunicipales.Application.Interfaces.Persistence.Extensions;
 using SistemaApoyosMunicipales.Domain.Entities.Documentos;
 using SistemaApoyosMunicipales.Domain.Entities.RegistroDeApoyos;
+using SistemaApoyosMunicipales.Domain.Estados;
 using SistemaApoyosMunicipales.Infrastructure.Persistence;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace SistemaApoyosMunicipales.Infrastructure.Repositories
 {
     public sealed class RegistroApoyoRepository
-          : IRegistroApoyoRepository
+        : IRegistroApoyoRepository
     {
         private readonly AppDbContext _context;
 
@@ -81,7 +79,9 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
             Guid id)
         {
             await _context.RegistroApoyos
-                .Where(x => x.Id == id)
+                .Where(x =>
+                    x.Id == id &&
+                    x.DeletedAt == null)
                 .ExecuteUpdateAsync(x => x
                     .SetProperty(
                         p => p.DeletedAt,
@@ -94,36 +94,10 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
                         DateTimeOffset.UtcNow));
         }
 
-
-
-        public async Task<List<RegistroApoyoDocumento>>
-            ObtenerDocumentosAsync(
-                Guid registroApoyoId)
-        {
-            return await _context
-                .RegistroApoyoDocumentos
-                .AsNoTracking()
-                .Where(x =>
-                    x.RegistroApoyoId ==
-                    registroApoyoId)
-                .ToListAsync();
-        }
-
-        public async Task EliminarDocumentosAsync(
-            Guid registroApoyoId)
-        {
-            await _context
-                .RegistroApoyoDocumentos
-                .Where(x =>
-                    x.RegistroApoyoId ==
-                    registroApoyoId)
-                .ExecuteDeleteAsync();
-        }
-
-
-        public async Task<PaginatedResult<RegistroApoyo>> ObtenerPorComunidadAsync(
-    Guid comunidadId,
-    PaginationRequest pagination)
+        public async Task<PaginatedResult<RegistroApoyo>>
+            ObtenerPorComunidadAsync(
+                Guid comunidadId,
+                PaginationRequest pagination)
         {
             return await _context.RegistroApoyos
                 .AsNoTracking()
@@ -134,15 +108,15 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
                 .Where(x =>
                     x.ComunidadId == comunidadId &&
                     x.DeletedAt == null)
-                .OrderBy(x => x.Id) // o FechaCreacion si tienes mejor campo
+                .OrderByDescending(x => x.CreatedAt)
                 .PaginateAsync(
                     pagination.PageNumber,
                     pagination.PageSize);
         }
 
-
-        public async Task<PaginatedResult<RegistroApoyo>> ObtenerTodosAsync(
-          PaginationRequest pagination)
+        public async Task<PaginatedResult<RegistroApoyo>>
+            ObtenerTodosAsync(
+                PaginationRequest pagination)
         {
             return await _context.RegistroApoyos
                 .AsNoTracking()
@@ -156,22 +130,89 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
                     pagination.PageSize);
         }
 
-
-        public async Task<bool> ExisteAsync(Guid id)
+        public async Task<bool> ExisteAsync(
+            Guid id)
         {
             return await _context.RegistroApoyos
-                .AnyAsync(r => r.Id == id && r.Activo == true);
+                .AsNoTracking()
+                .AnyAsync(x =>
+                    x.Id == id &&
+                    x.Activo &&
+                    x.DeletedAt == null);
         }
 
-        public async Task AgregarDocumentoAsync(RegistroApoyoDocumento documento)
+        public async Task<bool> ExisteFolioAsync(
+            string folio)
         {
-            await _context.RegistroApoyoDocumentos.AddAsync(documento);
+            var folioNormalizado = folio
+                .Trim()
+                .ToUpper();
+
+            return await _context.RegistroApoyos
+                .AsNoTracking()
+                .AnyAsync(x =>
+                    x.DeletedAt == null &&
+                    x.Folio.ToUpper() == folioNormalizado);
         }
 
-        public async Task AgregarDocumentosAsync(List<RegistroApoyoDocumento> documentos)
+        public async Task<bool> ExisteFolioEnOtroRegistroAsync(
+            string folio,
+            Guid registroId)
         {
-            await _context.RegistroApoyoDocumentos.AddRangeAsync(documentos);
+            var folioNormalizado = folio
+                .Trim()
+                .ToUpper();
+
+            return await _context.RegistroApoyos
+                .AsNoTracking()
+                .AnyAsync(x =>
+                    x.Id != registroId &&
+                    x.DeletedAt == null &&
+                    x.Folio.ToUpper() == folioNormalizado);
         }
 
+        public async Task<List<RegistroApoyoDocumento>>
+            ObtenerDocumentosAsync(
+                Guid registroApoyoId)
+        {
+            return await _context.RegistroApoyoDocumentos
+                .AsNoTracking()
+                .Where(x =>
+                    x.RegistroApoyoId == registroApoyoId)
+                .ToListAsync();
+        }
+
+        public async Task EliminarDocumentosAsync(
+            Guid registroApoyoId)
+        {
+            await _context.RegistroApoyoDocumentos
+                .Where(x =>
+                    x.RegistroApoyoId == registroApoyoId)
+                .ExecuteDeleteAsync();
+        }
+
+        public async Task AgregarDocumentoAsync(
+            RegistroApoyoDocumento documento)
+        {
+            await _context.RegistroApoyoDocumentos
+                .AddAsync(documento);
+        }
+
+        public async Task AgregarDocumentosAsync(
+            List<RegistroApoyoDocumento> documentos)
+        {
+            await _context.RegistroApoyoDocumentos
+                .AddRangeAsync(documentos);
+        }
+
+        public async Task<List<EstadoSolicitud>>
+            ObtenerEstadosSolicitudAsync()
+        {
+            return await _context.EstadosSolicitud
+                .AsNoTracking()
+                .Where(x => x.Activo)
+                .OrderBy(x => x.Nombre)
+                .ToListAsync();
+        }
     }
 }
