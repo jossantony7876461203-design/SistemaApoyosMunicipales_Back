@@ -1,15 +1,13 @@
 ﻿using SistemaApoyosMunicipales.Application.Common.Models;
 using SistemaApoyosMunicipales.Application.DTOs.RegistroApoyo;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace SistemaApoyosMunicipales.Application.Interfaces.Auth
 {
     public interface IRegistroApoyoService
     {
         Task<Guid> CrearAsync(
-            CrearRegistroApoyoDto dto,  Guid usuarioId);
+            CrearRegistroApoyoDto dto,
+            Guid usuarioId);
 
         Task ActualizarAsync(
             Guid id,
@@ -29,10 +27,18 @@ namespace SistemaApoyosMunicipales.Application.Interfaces.Auth
 
         Task EliminarAsync(Guid id);
 
-        Task<PaginatedResult<ObtenerRegistroApoyoGlobalDto>> ObtenerTodosAsync(PaginationRequest pagination);
+        Task<PaginatedResult<ObtenerRegistroApoyoGlobalDto>>
+            ObtenerTodosAsync(PaginationRequest pagination);
 
-        Task<ObtenerRegistroApoyoDetalleDto> ObtenerDetalleAsync(Guid id);
+        Task<ObtenerRegistroApoyoDetalleDto>
+            ObtenerDetalleAsync(Guid id);
 
-        Task<List<RegistroApoyoDocumentoDto>> AgregarDocumentosAsync(Guid id, AgregarDocumentosRegistroApoyoDto dto);
+        Task<List<RegistroApoyoDocumentoDto>>
+            AgregarDocumentosAsync(
+                Guid id,
+                AgregarDocumentosRegistroApoyoDto dto);
+
+        Task<List<EstadoSolicitudCatalogoDto>>
+            ObtenerEstadosSolicitudAsync();
     }
 }

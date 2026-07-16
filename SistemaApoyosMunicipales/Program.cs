@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Mvc;
 using SistemaApoyosMunicipales.API;
 using SistemaApoyosMunicipales.API.Middlewares;
 using SistemaApoyosMunicipales.Application;
@@ -14,6 +13,17 @@ builder.Services
     .AddPresentation(builder.Configuration)
     .AddApplication(builder.Configuration)
     .AddInfrastructure(builder.Configuration);
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Frontend", policy =>
+    {
+        policy
+            .WithOrigins("http://localhost:5173")
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 
 // ==========================================
 // APP
@@ -38,6 +48,8 @@ if (app.Environment.IsDevelopment())
             "Sistema Apoyos Municipales API v1");
     });
 }
+
+app.UseCors("Frontend");
 
 app.UseAuthentication();
 
