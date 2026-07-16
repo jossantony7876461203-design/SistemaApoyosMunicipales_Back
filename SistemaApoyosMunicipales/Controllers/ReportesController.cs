@@ -52,5 +52,45 @@ namespace SistemaApoyosMunicipales.API.Controllers
 
             return File(pdfBytes, "application/pdf", nombreArchivo);
         }
+
+
+        [HttpGet("comunidades/excel")]
+        public async Task<IActionResult> ExportarComunidadesExcel([FromQuery] FiltroReporteDto filtro)
+        {
+            var archivo = await _reportesService.ExportarComunidadesExcelAsync(filtro);
+            return File(archivo,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"Comunidades_{DateTime.Now:yyyyMMdd}.xlsx");
+        }
+
+        [HttpGet("comunidades/{comunidadId:guid}/apoyos/excel")]
+        public async Task<IActionResult> ExportarApoyosPorComunidadExcel(
+    Guid comunidadId,
+    [FromQuery] FiltroReporteDto filtro)
+        {
+            var archivo = await _reportesService.ExportarApoyosPorComunidadExcelAsync(comunidadId, filtro);
+            return File(archivo,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"Apoyos_Comunidad_{DateTime.Now:yyyyMMdd}.xlsx");
+        }
+
+
+        [HttpGet("fondos/excel")]
+        public async Task<IActionResult> ExportarFondosExcel([FromQuery] FiltroReporteDto filtro)
+        {
+            var archivo = await _reportesService.ExportarFondosExcelAsync(filtro);
+            return File(archivo,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"Fondos_{DateTime.Now:yyyyMMdd}.xlsx");
+        }
+
+        [HttpGet("apoyos/excel")]
+        public async Task<IActionResult> ExportarApoyosExcel([FromQuery] FiltroReporteDto filtro)
+        {
+            var archivo = await _reportesService.ExportarApoyosExcelAsync(filtro);
+            return File(archivo,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"Apoyos_{DateTime.Now:yyyyMMdd}.xlsx");
+        }
     }
 }

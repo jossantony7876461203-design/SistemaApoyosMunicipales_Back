@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Options;
+﻿using ClosedXML.Excel;
+using Microsoft.Extensions.Options;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -13,6 +14,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using ClosedXML.Excel;
 
 // Alias explícitos
 using Document = QuestPDF.Fluent.Document;
@@ -60,7 +62,115 @@ namespace SistemaApoyosMunicipales.Application.Services
             return GenerarPdfReporteAnual(reporte);
         }
 
-        private static (DateTimeOffset Desde, DateTimeOffset Hasta) CalcularRango(FiltroReporteDto filtro)
+
+
+
+
+// --- COMUNIDADES ---
+public async Task<byte[]> ExportarComunidadesExcelAsync(FiltroReporteDto filtro)
+    {
+        var (desde, hasta) = CalcularRango(filtro);
+        var comunidades = await _reportesRepository.ObtenerResumenPorComunidadAsync(
+            desde, hasta, filtro.ComunidadIds, filtro.ApoyoIds);
+
+        using var libro = new XLWorkbook();
+        var hoja = libro.Worksheets.Add("Comunidades");
+
+        EscribirEncabezados(hoja, "Comunidad", "Delegado", "Total Apoyos", "Monto Total");
+
+        int fila = 2;
+        foreach (var c in comunidades)
+        {
+            hoja.Cell(fila, 1).Value = c.Comunidad;
+            hoja.Cell(fila, 2).Value = c.Delegado ?? "-";
+            hoja.Cell(fila, 3).Value = c.TotalApoyos;
+            hoja.Cell(fila, 4).Value = c.TotalDinero;
+            hoja.Cell(fila, 4).Style.NumberFormat.Format = "$#,##0.00";
+            fila++;
+        }
+
+        return FinalizarLibro(hoja, libro);
+    }
+
+    // --- FONDOS ---
+    public async Task<byte[]> ExportarFondosExcelAsync(FiltroReporteDto filtro)
+    {
+        var (desde, hasta) = CalcularRango(filtro);
+        var fondos = await _reportesRepository.ObtenerResumenPorFondoAsync(desde, hasta, filtro.ApoyoIds);
+
+        using var libro = new XLWorkbook();
+        var hoja = libro.Worksheets.Add("Fondos");
+
+        EscribirEncabezados(hoja, "Fondo", "Total Apoyos", "Monto Total");
+
+        int fila = 2;
+        foreach (var f in fondos)
+        {
+            hoja.Cell(fila, 1).Value = f.Nombre;
+            hoja.Cell(fila, 2).Value = f.TotalApoyos;
+            hoja.Cell(fila, 3).Value = f.TotalDinero;
+            hoja.Cell(fila, 3).Style.NumberFormat.Format = "$#,##0.00";
+            fila++;
+        }
+
+        return FinalizarLibro(hoja, libro);
+    }
+
+    // --- APOYOS (con todos los filtros) ---
+    public async Task<byte[]> ExportarApoyosExcelAsync(FiltroReporteDto filtro)
+    {
+        var (desde, hasta) = CalcularRango(filtro);
+        var apoyos = await _reportesRepository.ObtenerTodosLosApoyosAsync(
+            desde, hasta, filtro.ComunidadIds, filtro.ApoyoIds);
+
+        using var libro = new XLWorkbook();
+        var hoja = libro.Worksheets.Add("Apoyos");
+
+        EscribirEncabezados(hoja, "Folio", "Comunidad", "Fondo", "Fecha", "Monto", "Estado");
+
+        int fila = 2;
+        foreach (var a in apoyos)
+        {
+            hoja.Cell(fila, 1).Value = a.Folio;
+            hoja.Cell(fila, 2).Value = a.Comunidad;
+            hoja.Cell(fila, 3).Value = a.Fondo;
+            hoja.Cell(fila, 4).Value = a.FechaApoyo.DateTime;
+            hoja.Cell(fila, 4).Style.DateFormat.Format = "dd/MM/yyyy";
+            hoja.Cell(fila, 5).Value = a.MontoOtorgado;
+            hoja.Cell(fila, 5).Style.NumberFormat.Format = "$#,##0.00";
+            hoja.Cell(fila, 6).Value = a.Estado;
+            fila++;
+        }
+
+        return FinalizarLibro(hoja, libro);
+    }
+
+    // --- HELPERS PRIVADOS COMPARTIDOS ---
+    private static void EscribirEncabezados(IXLWorksheet hoja, params string[] encabezados)
+    {
+        for (int i = 0; i < encabezados.Length; i++)
+        {
+            var celda = hoja.Cell(1, i + 1);
+            celda.Value = encabezados[i];
+            celda.Style.Font.SetBold();
+            celda.Style.Font.SetFontColor(XLColor.White);
+            celda.Style.Fill.SetBackgroundColor(XLColor.FromHtml(ColorVino));
+        }
+    }
+
+    private static byte[] FinalizarLibro(IXLWorksheet hoja, XLWorkbook libro)
+    {
+        hoja.Columns().AdjustToContents();
+        hoja.SheetView.FreezeRows(1);
+
+        using var stream = new MemoryStream();
+        libro.SaveAs(stream);
+        return stream.ToArray();
+    }
+
+
+
+    private static (DateTimeOffset Desde, DateTimeOffset Hasta) CalcularRango(FiltroReporteDto filtro)
         {
             DateTimeOffset desde = filtro.AnioInicio.HasValue
                 ? new DateTimeOffset(filtro.AnioInicio.Value, filtro.MesInicio ?? 1, 1, 0, 0, 0, TimeSpan.Zero)
@@ -204,6 +314,72 @@ namespace SistemaApoyosMunicipales.Application.Services
                     tabla.Cell().Element(CeldaEstilo).AlignRight().Text(FormatearMoneda(c.TotalDinero)).FontSize(9).Bold().FontColor(ColorVino);
                 }
             });
+        }
+
+
+
+        public async Task<byte[]> ExportarApoyosPorComunidadExcelAsync(Guid comunidadId, FiltroReporteDto filtro)
+        {
+            var comunidad = await _reportesRepository.ObtenerComunidadAsync(comunidadId);
+            if (comunidad is null)
+                throw new NotFoundException("Comunidad no encontrada");
+
+            var (desde, hasta) = CalcularRango(filtro);
+            var apoyos = await _reportesRepository.ObtenerApoyosDeComunidadAsync(
+                comunidadId, desde, hasta, filtro.ApoyoIds);
+
+            using var libro = new XLWorkbook();
+            var hoja = libro.Worksheets.Add("Detalle Comunidad");
+
+            // Título con el nombre real de la comunidad
+            hoja.Cell("A1").Value = $"Apoyos recibidos - {comunidad.Value.Comunidad}";
+            hoja.Range("A1:D1").Merge();
+            hoja.Cell("A1").Style.Font.SetBold().Font.SetFontSize(13)
+                .Font.SetFontColor(XLColor.White);
+            hoja.Cell("A1").Style.Fill.SetBackgroundColor(XLColor.FromHtml(ColorVino));
+
+            hoja.Cell("A2").Value = $"Delegado: {comunidad.Value.Delegado ?? "-"}  |  Periodo: {desde:dd/MM/yyyy} - {hasta:dd/MM/yyyy}";
+            hoja.Range("A2:D2").Merge();
+            hoja.Cell("A2").Style.Font.SetItalic();
+
+            EscribirEncabezados(hoja, "Folio", "Fondo", "Fecha", "Monto"); // en fila 1... hay que ajustar fila inicial
+
+            // Como ya usamos filas 1-2 para título, movemos encabezados a fila 4
+            int filaHeader = 4;
+            string[] encabezados = { "Folio", "Fondo", "Fecha", "Monto" };
+            for (int i = 0; i < encabezados.Length; i++)
+            {
+                var celda = hoja.Cell(filaHeader, i + 1);
+                celda.Value = encabezados[i];
+                celda.Style.Font.SetBold().Font.SetFontColor(XLColor.White);
+                celda.Style.Fill.SetBackgroundColor(XLColor.FromHtml(ColorVino));
+            }
+
+            int fila = filaHeader + 1;
+            foreach (var a in apoyos)
+            {
+                hoja.Cell(fila, 1).Value = a.Folio;
+                hoja.Cell(fila, 2).Value = a.Fondo;
+                hoja.Cell(fila, 3).Value = a.FechaApoyo.DateTime;
+                hoja.Cell(fila, 3).Style.DateFormat.Format = "dd/MM/yyyy";
+                hoja.Cell(fila, 4).Value = a.MontoOtorgado;
+                hoja.Cell(fila, 4).Style.NumberFormat.Format = "$#,##0.00";
+                fila++;
+            }
+
+            // Total
+            hoja.Cell(fila, 1).Value = "TOTAL";
+            hoja.Cell(fila, 1).Style.Font.SetBold();
+            hoja.Cell(fila, 4).FormulaA1 = $"=SUM(D{filaHeader + 1}:D{fila - 1})";
+            hoja.Cell(fila, 4).Style.NumberFormat.Format = "$#,##0.00";
+            hoja.Range(fila, 1, fila, 4).Style.Font.SetBold();
+
+            hoja.Columns().AdjustToContents();
+            hoja.SheetView.FreezeRows(filaHeader);
+
+            using var stream = new MemoryStream();
+            libro.SaveAs(stream);
+            return stream.ToArray();
         }
 
         private static void CeldaHeader(TableCellDescriptor header, string texto, bool alinearDerecha = false)

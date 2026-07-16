@@ -12,5 +12,6 @@ namespace SistemaApoyosMunicipales.Application.Interfaces.Auth
         Task RecuperarPasswordAsync(RecuperarPasswordDto dto);
         Task ResetPasswordAsync(ResetPasswordDto dto);
         Task ActivarCuentaAsync(string token);
+        Task ReenviarActivacionAsync(ReenviarActivacionDto dto);
     }
 }

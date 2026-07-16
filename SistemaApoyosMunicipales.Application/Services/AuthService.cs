@@ -237,4 +237,53 @@ public sealed class AuthService : IAuthService
 
         await _unitOfWork.SaveChangesAsync();
     }
+
+
+    public async Task ReenviarActivacionAsync(ReenviarActivacionDto dto)
+    {
+        var correo = dto.Correo.Trim().ToLower();
+
+        var usuario = await _usuarioRepository.ObtenerPorCorreoAsync(correo);
+
+        // No revelamos si el correo existe o no (misma filosofía que RecuperarPasswordAsync)
+        if (usuario is null)
+            return;
+
+        if (usuario.Activo)
+            return; // ya está activa, no tiene sentido reenviar
+
+        // --- Anti-spam: evita que reenvíen cada 2 segundos ---
+        var ultimoToken = await _tokenRepository.ObtenerUltimoPorUsuarioYTipoAsync(usuario.Id, "activacion");
+
+        if (ultimoToken is not null &&
+            ultimoToken.CreatedAt.AddMinutes(1) > DateTimeOffset.UtcNow)
+        {
+            throw new ValidationException("Espera un momento antes de solicitar otro correo de activación.");
+        }
+
+        // Invalida cualquier token de activación anterior que siga vivo
+        await _tokenRepository.InvalidarTokensAsync(usuario.Id, "activacion");
+
+        // Genera y guarda el nuevo token
+        var tokenPlano = _tokenService.GenerarTokenSeguro();
+
+        var token = new TokenVerificacion
+        {
+            UsuarioId = usuario.Id,
+            TokenHash = _hashService.GenerarSHA256(tokenPlano),
+            Tipo = "activacion",
+            ExpiraAt = DateTimeOffset.UtcNow.AddHours(24),
+            Usado = false,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        await _tokenRepository.CrearAsync(token);
+
+        await _emailService.EnviarActivacionAsync(
+            usuario.Correo,
+            usuario.Nombre,
+            tokenPlano);
+
+        await _unitOfWork.SaveChangesAsync();
+    }
 }

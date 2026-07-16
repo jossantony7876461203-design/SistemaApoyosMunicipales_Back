@@ -1,4 +1,5 @@
 ﻿using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SistemaApoyosMunicipales.Application.DTOs.Auth;
 using SistemaApoyosMunicipales.Application.Interfaces.Auth;
@@ -109,5 +110,17 @@ public class AuthController : ControllerBase
 
         await _authService.ResetPasswordAsync(dto);
         return Ok(new { mensaje = "Contraseña actualizada correctamente." });
+    }
+
+
+    [HttpPost("reenviar-activacion")]
+    public async Task<IActionResult> ReenviarActivacion([FromBody] ReenviarActivacionDto dto)
+    {
+        await _authService.ReenviarActivacionAsync(dto);
+
+        return Ok(new
+        {
+            Mensaje = "Si el correo existe y la cuenta no está activa, se ha reenviado un nuevo enlace de activación."
+        });
     }
 }

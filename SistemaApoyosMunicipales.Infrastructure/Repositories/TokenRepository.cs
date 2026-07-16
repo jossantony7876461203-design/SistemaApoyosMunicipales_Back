@@ -26,6 +26,24 @@ namespace SistemaApoyosMunicipales.Infrastructure.Persistence.Repositories
                 .FirstOrDefaultAsync(t => t.TokenHash == tokenHash);
         }
 
+        public async Task InvalidarTokensAsync(Guid usuarioId, string tipo)
+        {
+            var tokensActivos = await _context.TokensVerificacion
+                .Where(t => t.UsuarioId == usuarioId && t.Tipo == tipo && !t.Usado)
+                .ToListAsync();
+
+            foreach (var token in tokensActivos)
+                token.Usado = true;
+        }
+
+        public async Task<TokenVerificacion?> ObtenerUltimoPorUsuarioYTipoAsync(Guid usuarioId, string tipo)
+        {
+            return await _context.TokensVerificacion
+                .Where(t => t.UsuarioId == usuarioId && t.Tipo == tipo)
+                .OrderByDescending(t => t.CreatedAt)
+                .FirstOrDefaultAsync();
+        }
+
 
     }
 }

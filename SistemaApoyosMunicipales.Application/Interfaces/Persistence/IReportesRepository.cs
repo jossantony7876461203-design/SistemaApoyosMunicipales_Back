@@ -20,5 +20,20 @@ namespace SistemaApoyosMunicipales.Application.Interfaces.Persistence
             DateTimeOffset desde,
             DateTimeOffset hasta,
             List<Guid>? apoyoIds);
+
+        Task<List<ReporteApoyoGlobalDto>> ObtenerTodosLosApoyosAsync(
+    DateTimeOffset desde,
+    DateTimeOffset hasta,
+    List<Guid>? comunidadIds,
+    List<Guid>? apoyoIds);
+
+        Task<List<ReporteFondoDto>> ObtenerResumenPorFondoAsync(
+            DateTimeOffset desde,
+            DateTimeOffset hasta,
+            List<Guid>? apoyoIds);
     }
+
+
+
+
 }
