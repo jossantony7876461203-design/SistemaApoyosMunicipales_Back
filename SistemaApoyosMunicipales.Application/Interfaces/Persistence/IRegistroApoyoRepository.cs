@@ -51,5 +51,7 @@ namespace SistemaApoyosMunicipales.Application.Interfaces.Persistence
 
         Task<List<EstadoSolicitud>>
             ObtenerEstadosSolicitudAsync();
+
+
     }
 }

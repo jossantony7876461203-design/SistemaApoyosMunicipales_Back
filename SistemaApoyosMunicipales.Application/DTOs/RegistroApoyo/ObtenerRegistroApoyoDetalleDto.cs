@@ -22,5 +22,8 @@ namespace SistemaApoyosMunicipales.Application.DTOs.RegistroApoyo
         public string TipoDocumento { get; set; } = string.Empty;
         public decimal Monto { get; set; }
         public string? Descripcion { get; set; }
+        public bool Facturado { get; set; }
+        public string? MetodoPago { get; set; }
+        public DateTimeOffset? FechaFacturado { get; set; }
     }
 }

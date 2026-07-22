@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
 
@@ -14,16 +15,15 @@ namespace SistemaApoyosMunicipales.Application.DTOs.RegistroApoyo
         public decimal MontoOtorgado { get; set; }
         public string? Observaciones { get; set; }
 
-
-
-        /// <summary>Archivos de las facturas/documentos.</summary>
         public List<IFormFile>? Archivos { get; set; }
-
-        /// <summary>Monto de cada documento (mismo índice que Archivos).</summary>
         public List<decimal>? Montos { get; set; }
         public List<string>? Descripciones { get; set; }
-
-        /// <summary>Tipo de cada documento (opcional, mismo índice que Archivos).</summary>
         public List<string>? TiposDocumento { get; set; }
+        public List<bool>? Facturados { get; set; }
+
+        public List<string>? MetodosPago { get; set; }            // NUEVO, paralela a Archivos
+        public List<DateTimeOffset?>? FechasFacturado { get; set; } // NUEVO, paralela a Archivos
     }
+
+
 }

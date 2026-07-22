@@ -2,8 +2,6 @@
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SistemaApoyosMunicipales.Domain.Entities.Documentos;
 using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace SistemaApoyosMunicipales.Infrastructure.Persistence.Configurations
 {
@@ -47,18 +45,37 @@ namespace SistemaApoyosMunicipales.Infrastructure.Persistence.Configurations
                 .HasColumnName("created_at")
                 .HasDefaultValueSql("NOW()");
 
-            builder.Property(x => x.Descripcion)
-                 .HasColumnName("descripcion")
-    .HasMaxLength(500);
-
             builder.Property(x => x.Monto)
-        .HasColumnName("monto")
-        .HasColumnType("numeric(18,2)")
-        .IsRequired()
-        .HasDefaultValue(0);
+                .HasColumnName("monto")
+                .HasColumnType("numeric(18,2)")
+                .IsRequired()
+                .HasDefaultValue(0);
 
-            // Relación configurada del lado de RegistroApoyoConfiguration (HasMany)
+            // ✅ DESCRIPCION - CORREGIDO
+            builder.Property(x => x.Descripcion)
+                .HasColumnName("descripcion")
+                .HasMaxLength(500)
+                .IsRequired(false);  // Permite NULL
 
+            // ✅ FACTURADO - CORREGIDO
+            builder.Property(x => x.Facturado)
+                .HasColumnName("facturado")
+                .IsRequired()
+                .HasDefaultValue(false);
+
+            // ✅ METODO PAGO - CORREGIDO (antes estaba mal configurado)
+            builder.Property(x => x.MetodoPago)
+                .HasColumnName("metodo_pago")
+                .HasMaxLength(20)
+                .IsRequired(false);  // Permite NULL
+
+            // ✅ FECHA FACTURADO - CORREGIDO
+            builder.Property(x => x.FechaFacturado)
+                .HasColumnName("fecha_facturado")
+                .IsRequired(false)  // Permite NULL
+                .HasDefaultValueSql("NOW()");
+
+            // Índices
             builder.HasIndex(x => x.RegistroApoyoId);
         }
     }

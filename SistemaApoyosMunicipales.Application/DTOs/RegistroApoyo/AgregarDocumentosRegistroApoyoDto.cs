@@ -7,11 +7,15 @@ namespace SistemaApoyosMunicipales.Application.DTOs.RegistroApoyo
 {
     public sealed class AgregarDocumentosRegistroApoyoDto
     {
-    
-        public List<IFormFile> Archivos { get; set; } = new();
-        public List<decimal>? Montos { get; set; }
-        public List<string>? Descripciones { get; set; }
-        public List<string>? TiposDocumento { get; set; }
 
+      
+            public List<IFormFile> Archivos { get; set; } = new();
+            public List<decimal>? Montos { get; set; }
+            public List<string>? Descripciones { get; set; }
+            public List<string>? TiposDocumento { get; set; }
+            public List<bool>? Facturados { get; set; }
+            public List<string>? MetodosPago { get; set; }
+            public List<DateTimeOffset?>? FechasFacturado { get; set; }
+        
     }
 }

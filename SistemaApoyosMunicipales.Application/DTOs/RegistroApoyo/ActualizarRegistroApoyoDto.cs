@@ -13,7 +13,9 @@ namespace SistemaApoyosMunicipales.Application.DTOs.RegistroApoyo
         public DateTimeOffset FechaApoyo { get; set; }
         public decimal MontoOtorgado { get; set; }
         public string? Observaciones { get; set; }
-
+        public List<bool>? Facturados { get; set; }
+        public List<string>? MetodosPago { get; set; }            // NUEVO, paralela a Archivos
+        public List<DateTimeOffset?>? FechasFacturado { get; set; } // NUEVO, paralela a Archivos
 
         /// <summary>Archivos de las facturas/documentos (opcional; si no se manda, no se tocan los documentos actuales).</summary>
         public List<IFormFile>? Archivos { get; set; }

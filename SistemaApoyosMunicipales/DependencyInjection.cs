@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using SistemaApoyosMunicipales.API.Binders;
 using SistemaApoyosMunicipales.Application.Interfaces.Auth;
 using SistemaApoyosMunicipales.Infrastructure.Security;
 using System.Text;
@@ -20,6 +21,11 @@ namespace SistemaApoyosMunicipales.API
             services.AddControllers();
 
             services.AddEndpointsApiExplorer();
+
+            services.AddControllers(options =>
+            {
+                options.ModelBinderProviders.Insert(0, new JsonModelBinderProvider());
+            });
 
             // --- Swagger ---
             services.AddSwaggerGen(options =>

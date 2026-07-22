@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using DocumentFormat.OpenXml.Office2010.Excel;
+using Microsoft.AspNetCore.Http;
 using SistemaApoyosMunicipales.Application.Common.Models;
 using SistemaApoyosMunicipales.Application.DTOs.RegistroApoyo;
 using SistemaApoyosMunicipales.Application.Interfaces.Auth;
@@ -27,39 +28,24 @@ namespace SistemaApoyosMunicipales.Application.Services
         }
 
         // =========================
-        // CREAR
+        // CREAR - CORREGIDO
         // =========================
-        public async Task<Guid> CrearAsync(
-            CrearRegistroApoyoDto dto,
-            Guid usuarioId)
+        public async Task<Guid> CrearAsync(CrearRegistroApoyoDto dto, Guid usuarioId)
         {
-            var folio = dto.Folio
-                .Trim()
-                .ToUpperInvariant();
+            var folio = dto.Folio.Trim().ToUpperInvariant();
 
             if (string.IsNullOrWhiteSpace(folio))
-            {
-                throw new ValidationException(
-                    "El folio es obligatorio.");
-            }
+                throw new ValidationException("El folio es obligatorio.");
 
             if (await _registroRepository.ExisteFolioAsync(folio))
-            {
-                throw new ValidationException(
-                    "Ya existe un apoyo registrado con ese folio.");
-            }
+                throw new ValidationException("Ya existe un apoyo registrado con ese folio.");
 
-            ValidarDatosRegistro(
-                dto.ApoyoId,
-                dto.ComunidadId,
-                dto.EstadoSolicitudId,
-                dto.MontoOtorgado);
+            ValidarDatosRegistro(dto.ApoyoId, dto.ComunidadId, dto.EstadoSolicitudId, dto.MontoOtorgado);
 
             if (usuarioId == Guid.Empty)
-            {
-                throw new UnauthorizedException(
-                    "No se pudo identificar al usuario autenticado.");
-            }
+                throw new UnauthorizedException("No se pudo identificar al usuario autenticado.");
+
+
 
             var registro = new RegistroApoyo
             {
@@ -70,29 +56,30 @@ namespace SistemaApoyosMunicipales.Application.Services
                 EstadoSolicitudId = dto.EstadoSolicitudId,
                 FechaApoyo = dto.FechaApoyo,
                 MontoOtorgado = dto.MontoOtorgado,
-                Observaciones = string.IsNullOrWhiteSpace(dto.Observaciones)
-                    ? null
-                    : dto.Observaciones.Trim(),
+                Observaciones = string.IsNullOrWhiteSpace(dto.Observaciones) ? null : dto.Observaciones.Trim(),
                 RegistradoPor = usuarioId,
                 Activo = true,
                 CreatedAt = DateTimeOffset.UtcNow,
                 UpdatedAt = DateTimeOffset.UtcNow
             };
 
-            if (dto.Archivos is not null &&
-                dto.Archivos.Count > 0)
+     
+
+            // Subir documentos si existen
+            if (dto.Archivos is not null && dto.Archivos.Count > 0)
             {
-                var documentos = await SubirDocumentosAsync(
-                    registro.Id,
+                var nuevosDocumentos = await SubirDocumentosAsync(
+                    registro.Id,  // CORREGIDO: usar registro.Id
                     dto.Archivos,
                     dto.Montos,
                     dto.TiposDocumento,
-                    dto.Descripciones);
+                    dto.Descripciones,
+                    dto.Facturados,
+                    dto.MetodosPago,
+                    dto.FechasFacturado);
 
-                foreach (var documento in documentos)
-                {
+                foreach (var documento in nuevosDocumentos)  // CORREGIDO: usar nuevosDocumentos
                     registro.Documentos.Add(documento);
-                }
             }
 
             await _registroRepository.AgregarAsync(registro);
@@ -102,36 +89,27 @@ namespace SistemaApoyosMunicipales.Application.Services
         }
 
         // =========================
-        // ACTUALIZAR
+        // ACTUALIZAR - CORREGIDO
         // =========================
-        public async Task ActualizarAsync(
-            Guid id,
-            ActualizarRegistroApoyoDto dto)
+        public async Task ActualizarAsync(Guid id, ActualizarRegistroApoyoDto dto)
         {
-            var registro = await _registroRepository
-                .ObtenerPorIdParaEditarAsync(id);
+            var registro = await _registroRepository.ObtenerPorIdParaEditarAsync(id);
 
             if (registro is null)
             {
-                throw new NotFoundException(
-                    "El registro de apoyo no existe.");
+                throw new NotFoundException("El registro de apoyo no existe.");
             }
 
-            var folio = dto.Folio
-                .Trim()
-                .ToUpperInvariant();
+            var folio = dto.Folio.Trim().ToUpperInvariant();
 
             if (string.IsNullOrWhiteSpace(folio))
             {
-                throw new ValidationException(
-                    "El folio es obligatorio.");
+                throw new ValidationException("El folio es obligatorio.");
             }
 
-            if (await _registroRepository
-                .ExisteFolioEnOtroRegistroAsync(folio, id))
+            if (await _registroRepository.ExisteFolioEnOtroRegistroAsync(folio, id))
             {
-                throw new ValidationException(
-                    "Ya existe otro apoyo registrado con ese folio.");
+                throw new ValidationException("Ya existe otro apoyo registrado con ese folio.");
             }
 
             ValidarDatosRegistro(
@@ -140,67 +118,70 @@ namespace SistemaApoyosMunicipales.Application.Services
                 dto.EstadoSolicitudId,
                 dto.MontoOtorgado);
 
+            // Actualizar datos del registro
             registro.Folio = folio;
             registro.ApoyoId = dto.ApoyoId;
             registro.ComunidadId = dto.ComunidadId;
             registro.EstadoSolicitudId = dto.EstadoSolicitudId;
             registro.FechaApoyo = dto.FechaApoyo;
             registro.MontoOtorgado = dto.MontoOtorgado;
-            registro.Observaciones =
-                string.IsNullOrWhiteSpace(dto.Observaciones)
-                    ? null
-                    : dto.Observaciones.Trim();
+            registro.Observaciones = string.IsNullOrWhiteSpace(dto.Observaciones)
+                ? null
+                : dto.Observaciones.Trim();
             registro.UpdatedAt = DateTimeOffset.UtcNow;
 
             var publicIdsAEliminar = new List<string>();
 
-            if (dto.Archivos?.Count > 0)
+            // Si se enviaron nuevos archivos, reemplazar documentos
+            if (dto.Archivos is not null && dto.Archivos.Count > 0)
             {
-                var documentosActuales = await _registroRepository
-                    .ObtenerDocumentosAsync(id);
+                // Obtener documentos actuales para eliminar de Cloudinary
+                var documentosActuales = await _registroRepository.ObtenerDocumentosAsync(id);
 
                 publicIdsAEliminar = documentosActuales
                     .Select(documento => documento.PublicId)
-                    .Where(publicId =>
-                        !string.IsNullOrWhiteSpace(publicId))
+                    .Where(publicId => !string.IsNullOrWhiteSpace(publicId))
                     .ToList();
 
-                await _registroRepository
-                    .EliminarDocumentosAsync(id);
+                // Eliminar documentos de la base de datos
+                await _registroRepository.EliminarDocumentosAsync(id);
 
+                // Subir nuevos documentos
                 var nuevosDocumentos = await SubirDocumentosAsync(
                     id,
                     dto.Archivos,
                     dto.Montos,
                     dto.TiposDocumento,
-                    dto.Descripciones);
+                    dto.Descripciones,
+                    dto.Facturados,
+                    dto.MetodosPago,
+                    dto.FechasFacturado);
 
-                await _registroRepository
-                    .AgregarDocumentosAsync(nuevosDocumentos);
+                await _registroRepository.AgregarDocumentosAsync(nuevosDocumentos);
             }
 
+            // Guardar cambios en la base de datos
             await _unitOfWork.SaveChangesAsync();
 
+            // Eliminar documentos viejos de Cloudinary (después de guardar en DB)
             foreach (var publicId in publicIdsAEliminar)
             {
-                await _cloudinaryService
-                    .EliminarImagenAsync(publicId);
+                await _cloudinaryService.EliminarImagenAsync(publicId);
             }
         }
 
+
+        
         // =========================
         // OBTENER POR ID
         // =========================
-        public async Task<ObtenerRegistroApoyoDto>
-            ObtenerPorIdAsync(Guid id)
+        public async Task<ObtenerRegistroApoyoDto> ObtenerPorIdAsync(Guid id)
         {
-            var registro = await _registroRepository
-                .ObtenerPorIdAsync(id);
+            var registro = await _registroRepository.ObtenerPorIdAsync(id);
 
             if (registro is null)
             {
-                throw new NotFoundException(
-                    "El registro de apoyo no existe.");
+                throw new NotFoundException("El registro de apoyo no existe.");
             }
 
             return new ObtenerRegistroApoyoDto
@@ -219,178 +200,139 @@ namespace SistemaApoyosMunicipales.Application.Services
                 CreatedAt = registro.CreatedAt,
 
                 Documentos = registro.Documentos?
-                    .Select(documento =>
-                        new RegistroApoyoDocumentoDto
-                        {
-                            Id = documento.Id,
-                            NombreArchivo =
-                                documento.NombreArchivo,
-                            Url = documento.Url,
-                            TipoDocumento =
-                                documento.TipoDocumento,
-                            Monto = documento.Monto,
-                            Descripcion =
-                                documento.Descripcion
-                        })
-                    .ToList()
-                    ?? new List<RegistroApoyoDocumentoDto>()
+                    .Select(documento => new RegistroApoyoDocumentoDto
+                    {
+                        Id = documento.Id,
+                        NombreArchivo = documento.NombreArchivo,
+                        Url = documento.Url,
+                        TipoDocumento = documento.TipoDocumento,
+                        Monto = documento.Monto,
+                        Descripcion = documento.Descripcion,
+                        Facturado = documento.Facturado,
+                        MetodoPago = documento.MetodoPago,
+                        FechaFacturado = documento.FechaFacturado
+                    })
+                    .ToList() ?? new List<RegistroApoyoDocumentoDto>()
             };
         }
 
         // =========================
         // OBTENER POR COMUNIDAD
         // =========================
-        public async Task<
-            PaginatedResult<ObtenerRegistroApoyoListadoDto>>
-            ObtenerPorComunidadAsync(
-                Guid comunidadId,
-                PaginationRequest pagination)
+        public async Task<PaginatedResult<ObtenerRegistroApoyoListadoDto>> ObtenerPorComunidadAsync(
+            Guid comunidadId,
+            PaginationRequest pagination)
         {
-            var resultado = await _registroRepository
-                .ObtenerPorComunidadAsync(
-                    comunidadId,
-                    pagination);
+            var resultado = await _registroRepository.ObtenerPorComunidadAsync(comunidadId, pagination);
 
-            return new PaginatedResult<
-                ObtenerRegistroApoyoListadoDto>
+            return new PaginatedResult<ObtenerRegistroApoyoListadoDto>
             {
                 Items = resultado.Items
-                    .Select(registro =>
-                        new ObtenerRegistroApoyoListadoDto
-                        {
-                            Id = registro.Id,
-                            Apoyo =
-                                registro.Apoyo?.Nombre
-                                ?? string.Empty,
-                            Comunidad =
-                                registro.Comunidad?.Nombre
-                                ?? string.Empty,
-                            EstadoSolicitud =
-                                registro.EstadoSolicitud?.Nombre
-                                ?? string.Empty,
-                            MontoOtorgado =
-                                registro.MontoOtorgado,
-                            FechaApoyo =
-                                registro.FechaApoyo,
-                            Activo = registro.Activo
-                        })
-                    .ToList(),
+                    .Select(registro => new ObtenerRegistroApoyoListadoDto
+                    {
+                        Id = registro.Id,
+                        Apoyo = registro.Apoyo?.Nombre ?? string.Empty,
+                        Comunidad = registro.Comunidad?.Nombre ?? string.Empty,
+                        EstadoSolicitud = registro.EstadoSolicitud?.Nombre ?? string.Empty,
+                        MontoOtorgado = registro.MontoOtorgado,
+                        FechaApoyo = registro.FechaApoyo,
+                        Activo = registro.Activo
 
+                    })
+                    .ToList(),
                 PageNumber = resultado.PageNumber,
                 PageSize = resultado.PageSize,
                 TotalRecords = resultado.TotalRecords,
                 TotalPages = resultado.TotalPages,
-                HasPreviousPage =
-                    resultado.HasPreviousPage,
-                HasNextPage =
-                    resultado.HasNextPage
+                HasPreviousPage = resultado.HasPreviousPage,
+                HasNextPage = resultado.HasNextPage
             };
         }
 
         // =========================
         // CAMBIAR ESTADO
         // =========================
-        public async Task CambiarEstadoAsync(
-            Guid id,
-            Guid estadoSolicitudId)
+        public async Task CambiarEstadoAsync(Guid id, Guid estadoSolicitudId)
         {
             if (id == Guid.Empty)
             {
-                throw new ValidationException(
-                    "El identificador del registro no es válido.");
+                throw new ValidationException("El identificador del registro no es válido.");
             }
 
             if (estadoSolicitudId == Guid.Empty)
             {
-                throw new ValidationException(
-                    "Debes seleccionar un estado de solicitud.");
+                throw new ValidationException("Debes seleccionar un estado de solicitud.");
             }
 
-            var existe = await _registroRepository
-                .ExisteAsync(id);
+            var existe = await _registroRepository.ExisteAsync(id);
 
             if (!existe)
             {
-                throw new NotFoundException(
-                    "El registro de apoyo no existe.");
+                throw new NotFoundException("El registro de apoyo no existe.");
             }
 
-            await _registroRepository
-                .CambiarEstatusAsync(
-                    id,
-                    estadoSolicitudId);
-
+            await _registroRepository.CambiarEstatusAsync(id, estadoSolicitudId);
             await _unitOfWork.SaveChangesAsync();
         }
 
         // =========================
         // AGREGAR DOCUMENTOS
         // =========================
-        public async Task<List<RegistroApoyoDocumentoDto>>
-            AgregarDocumentosAsync(
-                Guid id,
-                AgregarDocumentosRegistroApoyoDto dto)
+        public async Task<List<RegistroApoyoDocumentoDto>> AgregarDocumentosAsync(
+            Guid id,
+            AgregarDocumentosRegistroApoyoDto dto)
         {
-            var existe = await _registroRepository
-                .ExisteAsync(id);
+            var existe = await _registroRepository.ExisteAsync(id);
 
             if (!existe)
             {
-                throw new NotFoundException(
-                    "El registro de apoyo no existe.");
+                throw new NotFoundException("El registro de apoyo no existe.");
             }
 
-            if (dto.Archivos is null ||
-                dto.Archivos.Count == 0)
+            if (dto.Archivos is null || dto.Archivos.Count == 0)
             {
-                throw new BadRequestException(
-                    "Debes adjuntar al menos un archivo.");
+                throw new BadRequestException("Debes adjuntar al menos un archivo.");
             }
 
-            var nuevosDocumentos =
-                await SubirDocumentosAsync(
-                    id,
-                    dto.Archivos,
-                    dto.Montos,
-                    dto.TiposDocumento,
-                    dto.Descripciones);
+            var nuevosDocumentos = await SubirDocumentosAsync(
+                id,
+                dto.Archivos,
+                dto.Montos,
+                dto.TiposDocumento,
+                dto.Descripciones,
+                dto.Facturados,
+                dto.MetodosPago,
+                dto.FechasFacturado);
 
-            await _registroRepository
-                .AgregarDocumentosAsync(
-                    nuevosDocumentos);
-
+            await _registroRepository.AgregarDocumentosAsync(nuevosDocumentos);
             await _unitOfWork.SaveChangesAsync();
 
             return nuevosDocumentos
-                .Select(documento =>
-                    new RegistroApoyoDocumentoDto
-                    {
-                        Id = documento.Id,
-                        NombreArchivo =
-                            documento.NombreArchivo,
-                        Url = documento.Url,
-                        TipoDocumento =
-                            documento.TipoDocumento,
-                        Monto = documento.Monto,
-                        Descripcion =
-                            documento.Descripcion
-                    })
+                .Select(documento => new RegistroApoyoDocumentoDto
+                {
+                    Id = documento.Id,
+                    NombreArchivo = documento.NombreArchivo,
+                    Url = documento.Url,
+                    TipoDocumento = documento.TipoDocumento,
+                    Monto = documento.Monto,
+                    Descripcion = documento.Descripcion,
+                    Facturado = documento.Facturado,
+                    MetodoPago = documento.MetodoPago,
+                    FechaFacturado = documento.FechaFacturado
+                })
                 .ToList();
         }
 
         // =========================
         // DETALLE
         // =========================
-        public async Task<ObtenerRegistroApoyoDetalleDto>
-            ObtenerDetalleAsync(Guid id)
+        public async Task<ObtenerRegistroApoyoDetalleDto> ObtenerDetalleAsync(Guid id)
         {
-            var registro = await _registroRepository
-                .ObtenerPorIdAsync(id);
+            var registro = await _registroRepository.ObtenerPorIdAsync(id);
 
             if (registro is null)
             {
-                throw new NotFoundException(
-                    "El registro de apoyo no existe.");
+                throw new NotFoundException("El registro de apoyo no existe.");
             }
 
             return new ObtenerRegistroApoyoDetalleDto
@@ -398,72 +340,55 @@ namespace SistemaApoyosMunicipales.Application.Services
                 Id = registro.Id,
                 Descripcion = registro.Observaciones,
                 Delegado = registro.Comunidad?.Delegado,
-                Estatus =
-                    registro.EstadoSolicitud?.Nombre,
-
+                Estatus = registro.EstadoSolicitud?.Nombre,
                 Documentos = registro.Documentos?
-                    .Select(documento =>
-                        new RegistroApoyoDocumentoDetalleDto
-                        {
-                            Id = documento.Id,
-                            NombreArchivo =
-                                documento.NombreArchivo,
-                            Url = documento.Url,
-                            TipoDocumento =
-                                documento.TipoDocumento,
-                            Monto = documento.Monto,
-                            Descripcion =
-                                documento.Descripcion
-                        })
-                    .ToList()
-                    ?? new List<
-                        RegistroApoyoDocumentoDetalleDto>()
+                    .Select(documento => new RegistroApoyoDocumentoDetalleDto
+                    {
+                        Id = documento.Id,
+                        NombreArchivo = documento.NombreArchivo,
+                        Url = documento.Url,
+                        TipoDocumento = documento.TipoDocumento,
+                        Monto = documento.Monto,
+                        Descripcion = documento.Descripcion,
+                        Facturado = documento.Facturado,
+                        MetodoPago = documento.MetodoPago,
+                        FechaFacturado = documento.FechaFacturado
+
+                    })
+                    .ToList() ?? new List<RegistroApoyoDocumentoDetalleDto>()
             };
         }
 
         // =========================
         // LISTADO GLOBAL
         // =========================
-        public async Task<
-            PaginatedResult<ObtenerRegistroApoyoGlobalDto>>
-            ObtenerTodosAsync(
-                PaginationRequest pagination)
+        public async Task<PaginatedResult<ObtenerRegistroApoyoGlobalDto>> ObtenerTodosAsync(
+            PaginationRequest pagination)
         {
-            var resultado = await _registroRepository
-                .ObtenerTodosAsync(pagination);
+            var resultado = await _registroRepository.ObtenerTodosAsync(pagination);
 
-            return new PaginatedResult<
-                ObtenerRegistroApoyoGlobalDto>
+            return new PaginatedResult<ObtenerRegistroApoyoGlobalDto>
             {
                 Items = resultado.Items
-                    .Select(registro =>
-                        new ObtenerRegistroApoyoGlobalDto
-                        {
-                            Id = registro.Id,
-                            Folio = registro.Folio,
-                            Comunidad =
-                                registro.Comunidad?.Nombre,
-                            Fondo =
-                                registro.Apoyo?.Nombre,
-                            TipoApoyo =
-                                registro.Apoyo?.Nombre,
-                            FechaRegistro =
-                                registro.CreatedAt,
-                            Estado =
-                                registro.EstadoSolicitud?.Nombre,
-                            Delegado =
-                                registro.Comunidad?.Delegado
-                        })
-                    .ToList(),
+                    .Select(registro => new ObtenerRegistroApoyoGlobalDto
+                    {
+                        Id = registro.Id,
+                        Folio = registro.Folio,
+                        Comunidad = registro.Comunidad?.Nombre,
+                        Fondo = registro.Apoyo?.Nombre,
+                        TipoApoyo = registro.Apoyo?.Nombre,
+                        FechaRegistro = registro.CreatedAt,
+                        Estado = registro.EstadoSolicitud?.Nombre,
+                        Delegado = registro.Comunidad?.Delegado
 
+                    })
+                    .ToList(),
                 PageNumber = resultado.PageNumber,
                 PageSize = resultado.PageSize,
                 TotalRecords = resultado.TotalRecords,
                 TotalPages = resultado.TotalPages,
-                HasPreviousPage =
-                    resultado.HasPreviousPage,
-                HasNextPage =
-                    resultado.HasNextPage
+                HasPreviousPage = resultado.HasPreviousPage,
+                HasNextPage = resultado.HasNextPage
             };
         }
 
@@ -472,13 +397,11 @@ namespace SistemaApoyosMunicipales.Application.Services
         // =========================
         public async Task EliminarAsync(Guid id)
         {
-            var existe = await _registroRepository
-                .ExisteAsync(id);
+            var existe = await _registroRepository.ExisteAsync(id);
 
             if (!existe)
             {
-                throw new NotFoundException(
-                    "El registro de apoyo no existe.");
+                throw new NotFoundException("El registro de apoyo no existe.");
             }
 
             await _registroRepository.EliminarAsync(id);
@@ -488,21 +411,16 @@ namespace SistemaApoyosMunicipales.Application.Services
         // =========================
         // CATÁLOGO DE ESTADOS
         // =========================
-        public async Task<List<EstadoSolicitudCatalogoDto>>
-            ObtenerEstadosSolicitudAsync()
+        public async Task<List<EstadoSolicitudCatalogoDto>> ObtenerEstadosSolicitudAsync()
         {
-            var estados = await _registroRepository
-                .ObtenerEstadosSolicitudAsync();
+            var estados = await _registroRepository.ObtenerEstadosSolicitudAsync();
 
             return estados
-                .Select(estado =>
-                    new EstadoSolicitudCatalogoDto
-                    {
-                        Id = estado.Id,
-                        Nombre =
-                            estado.Nombre
-                            ?? string.Empty
-                    })
+                .Select(estado => new EstadoSolicitudCatalogoDto
+                {
+                    Id = estado.Id,
+                    Nombre = estado.Nombre ?? string.Empty
+                })
                 .ToList();
         }
 
@@ -517,48 +435,45 @@ namespace SistemaApoyosMunicipales.Application.Services
         {
             if (apoyoId == Guid.Empty)
             {
-                throw new ValidationException(
-                    "Debes seleccionar un tipo de apoyo.");
+                throw new ValidationException("Debes seleccionar un tipo de apoyo.");
             }
 
             if (comunidadId == Guid.Empty)
             {
-                throw new ValidationException(
-                    "Debes seleccionar una comunidad.");
+                throw new ValidationException("Debes seleccionar una comunidad.");
             }
 
             if (estadoSolicitudId == Guid.Empty)
             {
-                throw new ValidationException(
-                    "Debes seleccionar un estado de solicitud.");
+                throw new ValidationException("Debes seleccionar un estado de solicitud.");
             }
 
             if (montoOtorgado <= 0)
             {
-                throw new ValidationException(
-                    "El monto otorgado debe ser mayor a cero.");
+                throw new ValidationException("El monto otorgado debe ser mayor a cero.");
             }
         }
 
         // =========================
-        // SUBIR DOCUMENTOS
+        // SUBIR DOCUMENTOS - ACTUALIZADO CON NUEVOS PARÁMETROS
         // =========================
-        private static readonly HashSet<string>
-            TiposDocumentoValidos =
-                new(StringComparer.OrdinalIgnoreCase)
-                {
-                    "imagen",
-                    "factura",
-                    "otro"
-                };
+        private static readonly HashSet<string> TiposDocumentoValidos =
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+                "imagen",
+                "factura",
+                "otro"
+            };
 
-        private async Task<List<RegistroApoyoDocumento>>
-            SubirDocumentosAsync(
-                Guid registroId,
-                List<IFormFile> archivos,
-                List<decimal>? montos,
-                List<string>? tiposDocumento,
-                List<string>? descripciones)
+        private async Task<List<RegistroApoyoDocumento>> SubirDocumentosAsync(
+            Guid registroId,
+            List<IFormFile> archivos,
+            List<decimal>? montos,
+            List<string>? tiposDocumento,
+            List<string>? descripciones,
+            List<bool>? facturados,
+            List<string>? metodosPago,
+            List<DateTimeOffset?>? fechasFacturado)
         {
             if (archivos.Count == 0)
             {
@@ -583,19 +498,15 @@ namespace SistemaApoyosMunicipales.Application.Services
                 }
             }
 
-            if (montos is not null &&
-                montos.Any(monto => monto < 0))
+            if (montos is not null && montos.Any(monto => monto < 0))
             {
-                throw new ValidationException(
-                    "Los montos de los documentos no pueden ser negativos.");
+                throw new ValidationException("Los montos de los documentos no pueden ser negativos.");
             }
 
-            var documentos =
-                new List<RegistroApoyoDocumento>();
+            var documentos = new List<RegistroApoyoDocumento>();
 
             var archivosIndexados = archivos
-                .Select((archivo, index) =>
-                    (archivo, index))
+                .Select((archivo, index) => (archivo, index))
                 .ToList();
 
             foreach (var lote in archivosIndexados.Chunk(3))
@@ -604,59 +515,63 @@ namespace SistemaApoyosMunicipales.Application.Services
                 {
                     var (archivo, index) = item;
 
-                    await using var stream =
-                        archivo.OpenReadStream();
+                    await using var stream = archivo.OpenReadStream();
 
-                    var resultado =
-                        await _cloudinaryService
-                            .SubirImagenAsync(
-                                stream,
-                                archivo.FileName,
-                                "registro-apoyos");
+                    var resultado = await _cloudinaryService.SubirImagenAsync(
+                        stream,
+                        archivo.FileName,
+                        "registro-apoyos");
 
-                    var monto =
-                        montos is not null &&
-                        index < montos.Count
-                            ? montos[index]
-                            : 0m;
+                    var monto = montos is not null && index < montos.Count
+                        ? montos[index]
+                        : 0m;
 
-                    var tipo =
-                        tiposDocumento is not null &&
-                        index < tiposDocumento.Count &&
-                        !string.IsNullOrWhiteSpace(
-                            tiposDocumento[index])
-                            ? tiposDocumento[index]
-                                .Trim()
-                                .ToLowerInvariant()
-                            : "factura";
+                    var tipo = tiposDocumento is not null &&
+                               index < tiposDocumento.Count &&
+                               !string.IsNullOrWhiteSpace(tiposDocumento[index])
+                        ? tiposDocumento[index].Trim().ToLowerInvariant()
+                        : "factura";
 
-                    var descripcion =
-                        descripciones is not null &&
-                        index < descripciones.Count &&
-                        !string.IsNullOrWhiteSpace(
-                            descripciones[index])
-                            ? descripciones[index].Trim()
-                            : null;
+                    var descripcion = descripciones is not null &&
+                                      index < descripciones.Count &&
+                                      !string.IsNullOrWhiteSpace(descripciones[index])
+                        ? descripciones[index].Trim()
+                        : null;
+
+                    var facturado = facturados is not null &&
+                                    index < facturados.Count
+                        ? facturados[index]
+                        : false;
+
+                    var metodoPago = metodosPago is not null &&
+                                     index < metodosPago.Count &&
+                                     !string.IsNullOrWhiteSpace(metodosPago[index])
+                        ? metodosPago[index].Trim()
+                        : null;
+
+                    var fechaFacturado = fechasFacturado is not null &&
+                                         index < fechasFacturado.Count
+                        ? fechasFacturado[index]
+                        : null;
 
                     return new RegistroApoyoDocumento
                     {
                         Id = Guid.NewGuid(),
                         RegistroApoyoId = registroId,
-                        NombreArchivo =
-                            archivo.FileName,
+                        NombreArchivo = archivo.FileName,
                         TipoDocumento = tipo,
                         Monto = monto,
                         Descripcion = descripcion,
                         Url = resultado.Url,
                         PublicId = resultado.PublicId,
-                        CreatedAt =
-                            DateTimeOffset.UtcNow
+                        Facturado = facturado,
+                        MetodoPago = metodoPago,
+                        FechaFacturado = fechaFacturado,
+                        CreatedAt = DateTimeOffset.UtcNow
                     };
                 });
 
-                var resultadoLote =
-                    await Task.WhenAll(tareas);
-
+                var resultadoLote = await Task.WhenAll(tareas);
                 documentos.AddRange(resultadoLote);
             }
 

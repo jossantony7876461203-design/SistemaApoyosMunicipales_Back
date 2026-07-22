@@ -17,6 +17,8 @@ namespace SistemaApoyosMunicipales.Application.DTOs.RegistroApoyo
         public decimal MontoOtorgado { get; set; }
         public string? Observaciones { get; set; }
         public bool Activo { get; set; }
+        public bool Facturado { get; set; }
+        public string? MetodoPago { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
 
         // Total de todas las facturas/documentos (opcional)

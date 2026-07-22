@@ -48,6 +48,8 @@ namespace SistemaApoyosMunicipales.Infrastructure.Persistence.Configurations
             builder.Property(x => x.Observaciones)
                 .HasColumnName("observaciones");
 
+      
+
             builder.Property(x => x.RegistradoPor)
                 .HasColumnName("registrado_por")
                 .IsRequired();

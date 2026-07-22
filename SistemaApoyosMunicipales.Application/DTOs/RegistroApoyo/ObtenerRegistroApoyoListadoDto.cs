@@ -19,5 +19,7 @@ namespace SistemaApoyosMunicipales.Application.DTOs.RegistroApoyo
         public DateTimeOffset FechaApoyo { get; set; }
 
         public bool Activo { get; set; }
+        public bool Facturado { get; set; }
+        public string? MetodoPago { get; set; }
     }
 }

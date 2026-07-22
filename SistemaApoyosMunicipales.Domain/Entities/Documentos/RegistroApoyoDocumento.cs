@@ -16,10 +16,11 @@ namespace SistemaApoyosMunicipales.Domain.Entities.Documentos
         public string PublicId { get; set; } = string.Empty;
         public decimal Monto { get; set; }
         public string? Descripcion { get; set; }
-
+        public bool Facturado { get; set; }
+        public string? MetodoPago { get; set; }         // <-- NUEVO
+        public DateTimeOffset? FechaFacturado { get; set; }  // <-- NUEVO
         public DateTimeOffset CreatedAt { get; set; }
 
-        // Navegación
         public RegistroApoyo RegistroApoyo { get; set; } = null!;
     }
 }

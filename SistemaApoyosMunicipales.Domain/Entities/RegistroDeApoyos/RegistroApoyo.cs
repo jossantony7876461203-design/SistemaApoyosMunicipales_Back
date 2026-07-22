@@ -26,6 +26,7 @@ namespace SistemaApoyosMunicipales.Domain.Entities.RegistroDeApoyos
         public Guid RegistradoPor { get; set; }
 
         public bool Activo { get; set; } = true;
+       
         public DateTimeOffset? DeletedAt { get; set; }
 
         public DateTimeOffset CreatedAt { get; set; }
@@ -36,5 +37,6 @@ namespace SistemaApoyosMunicipales.Domain.Entities.RegistroDeApoyos
         public Comunidad.Comunidad Comunidad { get; set; } = null!;
         public EstadoSolicitud EstadoSolicitud { get; set; } = null!;
         public ICollection<RegistroApoyoDocumento> Documentos { get; set; } = [];
+     
     }
 }
