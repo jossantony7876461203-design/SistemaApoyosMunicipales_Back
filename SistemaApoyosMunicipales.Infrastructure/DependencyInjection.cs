@@ -65,6 +65,7 @@ namespace SistemaApoyosMunicipales.Infrastructure
             services.AddScoped<IApoyoRepository, ApoyoRepository>();
             services.AddScoped<IRegistroApoyoRepository, RegistroApoyoRepository>();
             services.AddScoped<ICurrentUserService, CurrentUserService>();
+            services.AddScoped<IEstadoSolicitudRepository, EstadoSolicitudRepository>();
 
             // =========================
             // ESTADÍSTICAS / DASHBOARD (con caché en memoria)
