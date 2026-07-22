@@ -24,10 +24,9 @@ RUN apt-get update && \
 USER $APP_UID
 
 EXPOSE 8080
-EXPOSE 8081
 
 ENV ASPNETCORE_ENVIRONMENT=Production
-ENV ASPNETCORE_URLS=http://*:8080;https://*:8081
+ENV ASPNETCORE_URLS=http://*:8080
 
 # Esta fase se usa para compilar el proyecto de servicio
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
