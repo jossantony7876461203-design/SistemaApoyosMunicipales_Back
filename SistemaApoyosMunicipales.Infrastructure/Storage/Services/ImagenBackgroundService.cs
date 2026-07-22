@@ -5,8 +5,9 @@ using SistemaApoyosMunicipales.Application.Common.Models;
 using SistemaApoyosMunicipales.Application.Interfaces.Persistence;
 using SistemaApoyosMunicipales.Application.Interfaces.Storage;
 using System;
-using System.Collections.Generic;
-using System.Text;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace SistemaApoyosMunicipales.Application.Services
 {
@@ -32,19 +33,31 @@ namespace SistemaApoyosMunicipales.Application.Services
 
             while (!stoppingToken.IsCancellationRequested)
             {
-                if (_queue.Desencolar(out var tarea) && tarea is not null)
+                try // <-- Aquí es donde te pide el try
                 {
-                    await ProcesarTareaAsync(tarea);
+                    if (_queue.Desencolar(out var tarea) && tarea is not null)
+                    {
+                        await ProcesarTareaAsync(tarea, stoppingToken);
+                    }
+                    else
+                    {
+                        await Task.Delay(500, stoppingToken);
+                    }
                 }
-                else
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
-                    // Cola vacía — esperar 500ms antes de revisar de nuevo
-                    await Task.Delay(500, stoppingToken);
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error inesperado en el ciclo principal del BackgroundService.");
                 }
             }
+
+            _logger.LogInformation("ImagenBackgroundService detenido correctamente.");
         }
 
-        private async Task ProcesarTareaAsync(ImagenTarea tarea)
+        private async Task ProcesarTareaAsync(ImagenTarea tarea, CancellationToken stoppingToken)
         {
             // Marcar como procesando
             _queue.ActualizarEstado(tarea.Id, t =>
@@ -54,8 +67,6 @@ namespace SistemaApoyosMunicipales.Application.Services
 
             try
             {
-                // Crear scope porque ICloudinaryService y repositorios
-                // son Scoped y el BackgroundService es Singleton
                 using var scope = _scopeFactory.CreateScope();
 
                 var cloudinary = scope.ServiceProvider
@@ -67,7 +78,7 @@ namespace SistemaApoyosMunicipales.Application.Services
                 var unitOfWork = scope.ServiceProvider
                     .GetRequiredService<IUnitOfWork>();
 
-                // 1. Subir imagen a Cloudinary
+                // 1. Subir imagen a Cloudinary (Pásale el token si tu interfaz lo soporta)
                 using var stream = new MemoryStream(tarea.Bytes);
 
                 var resultado = await cloudinary.SubirImagenAsync(
@@ -75,22 +86,20 @@ namespace SistemaApoyosMunicipales.Application.Services
                     tarea.NombreArchivo,
                     tarea.Carpeta);
 
-                // 2. Actualizar comunidad en BD
+                // 2. Actualizar comunidad en BD (Pásale el stoppingToken si tus repositorios lo aceptan)
                 var comunidad = await comunidadRepo
                     .ObtenerPorIdParaEditarAsync(tarea.EntidadId);
 
                 if (comunidad is not null)
                 {
-                    // Si tenía imagen anterior, eliminarla de Cloudinary
                     if (!string.IsNullOrEmpty(comunidad.DelegadoInePubId))
-                        await cloudinary.EliminarImagenAsync(
-                            comunidad.DelegadoInePubId);
+                        await cloudinary.EliminarImagenAsync(comunidad.DelegadoInePubId);
 
                     comunidad.DelegadoIneUrl = resultado.Url;
                     comunidad.DelegadoInePubId = resultado.PublicId;
                     comunidad.UpdatedAt = DateTimeOffset.UtcNow;
 
-                    await unitOfWork.SaveChangesAsync();
+                    await unitOfWork.SaveChangesAsync(stoppingToken);
                 }
 
                 // 3. Marcar como completada
@@ -104,6 +113,11 @@ namespace SistemaApoyosMunicipales.Application.Services
                 _logger.LogInformation(
                     "Tarea {TareaId} completada. URL: {Url}",
                     tarea.Id, resultado.Url);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                // Si se canceló porque se apagó el servidor, re-lanzamos para que lo catchee el bucle principal
+                throw;
             }
             catch (Exception ex)
             {
