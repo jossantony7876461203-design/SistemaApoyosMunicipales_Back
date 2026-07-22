@@ -33,19 +33,30 @@ ENV ASPNETCORE_URLS=http://*:8080;https://*:8081
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["SistemaApoyosMunicipales/SistemaApoyosMunicipales.csproj", "SistemaApoyosMunicipales/"]
-RUN dotnet restore "SistemaApoyosMunicipales/SistemaApoyosMunicipales.csproj"
+
+# 1. Copiar los archivos .csproj de la API y de las capas de Clean Architecture
+COPY ["SistemaApoyosMunicipales/SistemaApoyosMunicipales.API.csproj", "SistemaApoyosMunicipales/"]
+COPY ["SistemaApoyosMunicipales.Application/SistemaApoyosMunicipales.Application.csproj", "SistemaApoyosMunicipales.Application/"]
+COPY ["SistemaApoyosMunicipales.Domain/SistemaApoyosMunicipales.Domain.csproj", "SistemaApoyosMunicipales.Domain/"]
+COPY ["SistemaApoyosMunicipales.Infrastructure/SistemaApoyosMunicipales.Infrastructure.csproj", "SistemaApoyosMunicipales.Infrastructure/"]
+
+# 2. Restaurar dependencias apuntando al proyecto principal (.API)
+RUN dotnet restore "SistemaApoyosMunicipales/SistemaApoyosMunicipales.API.csproj"
+
+# 3. Copiar el resto del código fuente
 COPY . .
+
+# 4. Compilar el proyecto apuntando al archivo .API.csproj
 WORKDIR "/src/SistemaApoyosMunicipales"
-RUN dotnet build "SistemaApoyosMunicipales.csproj" -c $BUILD_CONFIGURATION -o /app/build
+RUN dotnet build "SistemaApoyosMunicipales.API.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 # Esta fase se usa para publicar el proyecto de servicio
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "SistemaApoyosMunicipales.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "SistemaApoyosMunicipales.API.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 # Esta fase se usa en producción
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "SistemaApoyosMunicipales.dll"]
+ENTRYPOINT ["dotnet", "SistemaApoyosMunicipales.API.dll"]
