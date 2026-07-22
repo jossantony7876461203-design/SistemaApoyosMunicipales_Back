@@ -38,6 +38,7 @@ namespace SistemaApoyosMunicipales.Application
             services.AddScoped<ISubRolPermisoService, SubRolPermisoService>();
             services.AddScoped<IApoyoService, ApoyoService>();
             services.AddScoped<IRegistroApoyoService, RegistroApoyoService>();
+            services.AddScoped<IEstadoSolicitudService, EstadoSolicitudService>();
 
             // Asegúrate de tener registrado también el ReportesService si no lo tenías:
             services.AddScoped<IReportesService, ReportesService>();
