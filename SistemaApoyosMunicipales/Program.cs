@@ -13,21 +13,9 @@ builder.Services
     .AddApplication(builder.Configuration)
     .AddInfrastructure(builder.Configuration);
 
-// Configuración de puertos compatible con Docker local y Render
-var port = Environment.GetEnvironmentVariable("PORT");
-if (!string.IsNullOrEmpty(port))
-{
-    // Si Render provee un puerto dinámico
-    builder.WebHost.UseUrls($"http://*:{port}");
-}
-else
-{
-    // Localmente usamos HTTP puro para evitar problemas de certificados en contenedores
-    builder.WebHost.ConfigureKestrel(options =>
-    {
-        options.ListenAnyIP(8080);  // HTTP
-    });
-}
+// Asignación limpia de puertos: usa el puerto dinámico de Render si existe, o el 8080 por defecto para local/Docker.
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+builder.WebHost.UseUrls($"http://*:{port}");
 
 builder.Services.AddCors(options =>
 {
