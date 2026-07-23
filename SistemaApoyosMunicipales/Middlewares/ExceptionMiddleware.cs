@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using System.Net.Sockets;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -53,6 +54,13 @@ namespace SistemaApoyosMunicipales.API.Middlewares
                 throw exception;
             }
 
+            // Asegurar la presencia de cabeceras CORS en respuestas de error si el Origin está registrado
+            if (context.Request.Headers.TryGetValue("Origin", out var origin))
+            {
+                context.Response.Headers.AccessControlAllowOrigin = origin;
+                context.Response.Headers.AccessControlAllowCredentials = "true";
+            }
+
             context.Response.Clear();
             context.Response.ContentType = "application/json";
 
@@ -98,6 +106,10 @@ namespace SistemaApoyosMunicipales.API.Middlewares
                 DbUpdateException =>
                     (int)HttpStatusCode.BadRequest,
 
+                // Tiempos de espera o problemas de red al consultar el servidor o BD
+                TimeoutException or SocketException =>
+                    (int)HttpStatusCode.ServiceUnavailable,
+
                 _ =>
                     (int)HttpStatusCode.InternalServerError
             };
@@ -105,6 +117,17 @@ namespace SistemaApoyosMunicipales.API.Middlewares
 
         private string GetMessage(Exception exception)
         {
+            // Detección de fallos de conexión o caídas en la base de datos (PostgreSQL/Neon)
+            if (IsNetworkOrDatabaseException(exception))
+            {
+                if (_environment.IsDevelopment())
+                {
+                    return $"Error de conexión con la base de datos: {exception.InnerException?.Message ?? exception.Message}";
+                }
+
+                return "El servicio de base de datos no respondió a tiempo. Intente de nuevo en unos segundos.";
+            }
+
             return exception switch
             {
                 UnauthorizedException =>
@@ -141,6 +164,27 @@ namespace SistemaApoyosMunicipales.API.Middlewares
             }
 
             return "No se pudo guardar la información en la base de datos.";
+        }
+
+        private static bool IsNetworkOrDatabaseException(Exception exception)
+        {
+            var currentException = exception;
+
+            while (currentException != null)
+            {
+                if (currentException is SocketException
+                    || currentException is TimeoutException
+                    || currentException.GetType().Name.Contains("NpgsqlException", StringComparison.OrdinalIgnoreCase)
+                    || currentException.Message.Contains("Connection refused", StringComparison.OrdinalIgnoreCase)
+                    || currentException.Message.Contains("Timeout", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                currentException = currentException.InnerException;
+            }
+
+            return false;
         }
     }
 }

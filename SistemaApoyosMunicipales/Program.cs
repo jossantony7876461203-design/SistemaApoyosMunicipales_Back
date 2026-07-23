@@ -13,7 +13,7 @@ builder.Services
     .AddApplication(builder.Configuration)
     .AddInfrastructure(builder.Configuration);
 
-// Asignación limpia de puertos: usa el puerto dinámico de Render si existe, o el 8080 por defecto para local/Docker.
+// Asignación de puerto dinámico (Render / Local / Docker)
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 builder.WebHost.UseUrls($"http://*:{port}");
 
@@ -27,7 +27,7 @@ builder.Services.AddCors(options =>
                 "http://127.0.0.1:5173",
                 "http://192.168.0.100:5173",
                 "http://localhost:3000",
-                "https://amtda-apoyos-municipales-tula-de-al.vercel.app/"
+                "https://amtda-apoyos-municipales-tula-de-al.vercel.app" // 👈 Corregido: Sin barra al final
             )
             .AllowAnyHeader()
             .AllowAnyMethod()
@@ -36,14 +36,14 @@ builder.Services.AddCors(options =>
 });
 
 // ==========================================
-// APP
+// APP & MIDDLEWARES
 // ==========================================
 var app = builder.Build();
 
-// ==========================================
-// MIDDLEWARES
-// ==========================================
 app.UseMiddleware<ExceptionMiddleware>();
+
+// El middleware de CORS debe ejecutarse antes de Swagger, Autenticación y Controladores
+app.UseCors("Frontend");
 
 app.UseSwagger();
 app.UseSwaggerUI(options =>
@@ -52,8 +52,6 @@ app.UseSwaggerUI(options =>
         "/swagger/v1/swagger.json",
         "Sistema Apoyos Municipales API v1");
 });
-
-app.UseCors("Frontend");
 
 app.UseAuthentication();
 app.UseAuthorization();
