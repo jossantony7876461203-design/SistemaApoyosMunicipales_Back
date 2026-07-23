@@ -46,6 +46,7 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
         // =========================
         // RESUMEN (KPIs)
         // =========================
+        // =========================
         public async Task<ResumenDashboardDto> ObtenerResumenAsync()
         {
             var ahora = DateTimeOffset.UtcNow;
@@ -61,9 +62,7 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
 
             var registrosActivos = _context.RegistroApoyos
                 .AsNoTracking()
-                .Where(x =>
-                    x.DeletedAt == null &&
-                    x.Activo);
+                .Where(x => x.DeletedAt == null && x.Activo);
 
             var totalApoyos = await registrosActivos.CountAsync();
 
@@ -75,30 +74,21 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
                 .Distinct()
                 .CountAsync();
 
-            var comunidadesNuevasEsteMes = await registrosActivos
-                .Where(x => x.CreatedAt >= inicioDeMes)
-                .Select(x => x.ComunidadId)
-                .Distinct()
-                .CountAsync();
-
             var fondosActivos = await _context.Apoyos
                 .AsNoTracking()
-                .CountAsync(x =>
-                    x.Activo &&
-                    x.DeletedAt == null);
+                .CountAsync(x => x.Activo && x.DeletedAt == null);
 
+            // Ajuste seguro sin importar si viene "Pendiente", "pendiente", "PENDIENTE" o con espacios
             var pendientesValidar = await registrosActivos
-                .CountAsync(x =>
-                    x.EstadoSolicitud != null &&
-                    x.EstadoSolicitud.Clave != null &&
-                    x.EstadoSolicitud.Clave.ToLower() == "Pendiente");
+                .CountAsync(x => x.EstadoSolicitud != null
+                             && x.EstadoSolicitud.Clave != null
+                             && x.EstadoSolicitud.Clave.Trim().ToLower() == "pendiente");
 
             return new ResumenDashboardDto
             {
                 TotalApoyos = totalApoyos,
                 ApoyosEsteMes = apoyosEsteMes,
                 ComunidadesAtendidas = comunidadesAtendidas,
-                ComunidadesNuevasEsteMes = comunidadesNuevasEsteMes,
                 FondosActivos = fondosActivos,
                 PendientesValidar = pendientesValidar
             };
@@ -190,7 +180,9 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
                 .ToListAsync();
 
             var pendientes = await registrosDelAnio
-                .CountAsync(x => x.EstadoSolicitud.Clave == "Pendiente");
+                  .CountAsync(x => x.EstadoSolicitud != null
+                               && x.EstadoSolicitud.Clave != null
+                               && x.EstadoSolicitud.Clave.Trim().ToLower() == "pendiente");
 
             var validados = await registrosDelAnio
                 .CountAsync(x => x.EstadoSolicitud.Clave == "Validado");
