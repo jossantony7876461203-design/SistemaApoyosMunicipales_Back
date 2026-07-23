@@ -91,7 +91,7 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
                 .CountAsync(x =>
                     x.EstadoSolicitud != null &&
                     x.EstadoSolicitud.Clave != null &&
-                    x.EstadoSolicitud.Clave.ToLower() == "pendiente");
+                    x.EstadoSolicitud.Clave.ToLower() == "Pendiente");
 
             return new ResumenDashboardDto
             {
@@ -190,13 +190,13 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
                 .ToListAsync();
 
             var pendientes = await registrosDelAnio
-                .CountAsync(x => x.EstadoSolicitud.Clave == "pendiente");
+                .CountAsync(x => x.EstadoSolicitud.Clave == "Pendiente");
 
             var validados = await registrosDelAnio
-                .CountAsync(x => x.EstadoSolicitud.Clave == "validado");
+                .CountAsync(x => x.EstadoSolicitud.Clave == "Validado");
 
             var aprobados = await registrosDelAnio
-                .CountAsync(x => x.EstadoSolicitud.Clave == "aprobado");
+                .CountAsync(x => x.EstadoSolicitud.Clave == "Aprobado");
 
             return new TopComunidadesDto
             {
