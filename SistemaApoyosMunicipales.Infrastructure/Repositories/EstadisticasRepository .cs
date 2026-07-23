@@ -48,18 +48,27 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
         // =========================
         public async Task<ResumenDashboardDto> ObtenerResumenAsync()
         {
+            var ahora = DateTimeOffset.UtcNow;
+
             var inicioDeMes = new DateTimeOffset(
-                DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, TimeSpan.Zero);
+                ahora.Year,
+                ahora.Month,
+                1,
+                0,
+                0,
+                0,
+                TimeSpan.Zero);
 
             var registrosActivos = _context.RegistroApoyos
                 .AsNoTracking()
-                .Where(x => x.DeletedAt == null && x.Activo);
+                .Where(x =>
+                    x.DeletedAt == null &&
+                    x.Activo);
 
             var totalApoyos = await registrosActivos.CountAsync();
 
             var apoyosEsteMes = await registrosActivos
-                .Where(x => x.CreatedAt >= inicioDeMes)
-                .CountAsync();
+                .CountAsync(x => x.CreatedAt >= inicioDeMes);
 
             var comunidadesAtendidas = await registrosActivos
                 .Select(x => x.ComunidadId)
@@ -74,12 +83,15 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
 
             var fondosActivos = await _context.Apoyos
                 .AsNoTracking()
-                .Where(x => x.Activo && x.DeletedAt == null)
-                .CountAsync();
+                .CountAsync(x =>
+                    x.Activo &&
+                    x.DeletedAt == null);
 
             var pendientesValidar = await registrosActivos
-                .Where(x => x.EstadoSolicitud.Clave == "pendiente")
-                .CountAsync();
+                .CountAsync(x =>
+                    x.EstadoSolicitud != null &&
+                    x.EstadoSolicitud.Clave != null &&
+                    x.EstadoSolicitud.Clave.ToLower() == "pendiente");
 
             return new ResumenDashboardDto
             {
@@ -91,7 +103,6 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
                 PendientesValidar = pendientesValidar
             };
         }
-
         // =========================
         // APOYOS POR MES (gráfica de barras)
         // =========================

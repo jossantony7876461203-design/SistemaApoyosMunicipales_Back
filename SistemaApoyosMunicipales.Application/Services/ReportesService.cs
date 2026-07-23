@@ -84,7 +84,7 @@ namespace SistemaApoyosMunicipales.Application.Services
                 {
                     p.Size(PageSizes.A4);
                     p.Margin(45);
-                    p.DefaultTextStyle(x => x.FontSize(10).FontFamily("Arial").FontColor(ColorGrisTexto));
+                    p.DefaultTextStyle(x => x.FontSize(10).FontFamily("DejaVu Sans").FontColor(ColorGrisTexto));
 
                     p.Header().Element(c => GenerarCabecera(c, $"Informe: {comunidad.Value.Comunidad}", desde, hasta));
 
@@ -352,8 +352,7 @@ namespace SistemaApoyosMunicipales.Application.Services
                 {
                     pagina.Size(PageSizes.A4);
                     pagina.Margin(45);
-                    pagina.DefaultTextStyle(x => x.FontSize(10).FontFamily("Arial").FontColor(ColorGrisTexto));
-
+                    pagina.DefaultTextStyle(x => x.FontSize(10).FontFamily("DejaVu Sans").FontColor(ColorGrisTexto));
                     pagina.Header().Element(c => GenerarCabecera(c, "Reporte Consolidado de Apoyos", reporte.Desde, reporte.Hasta));
 
                     pagina.Content().PaddingTop(20).Column(col =>
@@ -448,10 +447,10 @@ namespace SistemaApoyosMunicipales.Application.Services
             {
                 tabla.ColumnsDefinition(c =>
                 {
-                    c.RelativeColumn(3f);
-                    c.RelativeColumn(4f);
-                    c.RelativeColumn(1.5f);
-                    c.RelativeColumn(2.5f);
+                    c.RelativeColumn(3f);  
+                    c.RelativeColumn(3.5f); 
+                    c.RelativeColumn(2f);   
+                    c.RelativeColumn(2.5f); 
                 });
 
                 tabla.Header(header =>
