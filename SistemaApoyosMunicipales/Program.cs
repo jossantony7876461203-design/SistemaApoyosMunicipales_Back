@@ -27,7 +27,7 @@ builder.Services.AddCors(options =>
                 "http://127.0.0.1:5173",
                 "http://192.168.0.100:5173",
                 "http://localhost:3000",
-                "http://tu-dominio.com"
+                "https://amtda-apoyos-municipales-tula-de-al.vercel.app/"
             )
             .AllowAnyHeader()
             .AllowAnyMethod()

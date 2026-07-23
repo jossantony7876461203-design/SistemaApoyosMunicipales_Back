@@ -26,7 +26,7 @@ public sealed class EmailService : IEmailService
 
     public async Task EnviarActivacionAsync(string correo, string nombre, string token)
     {
-        var urlActivacion = $"http://localhost:5173/activar?token={token}";
+        var urlActivacion = $"https://amtda-apoyos-municipales-tula-de-al.vercel.app/activar?token={token}";
 
         // 1. Cargar el HTML embebido desde los recursos de la DLL
         // NOTA: Ajusta "SistemaApoyosMunicipales.Infrastructure" si tu Namespace por defecto es diferente

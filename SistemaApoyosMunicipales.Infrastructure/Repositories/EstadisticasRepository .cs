@@ -4,7 +4,8 @@ using SistemaApoyosMunicipales.Application.Interfaces.Persistence;
 using SistemaApoyosMunicipales.Infrastructure.Persistence;
 using System;
 using System.Collections.Generic;
-using System.Text;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace SistemaApoyosMunicipales.Infrastructure.Repositories
 {
@@ -46,7 +47,6 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
         // =========================
         // RESUMEN (KPIs)
         // =========================
-        // =========================
         public async Task<ResumenDashboardDto> ObtenerResumenAsync()
         {
             var ahora = DateTimeOffset.UtcNow;
@@ -78,7 +78,6 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
                 .AsNoTracking()
                 .CountAsync(x => x.Activo && x.DeletedAt == null);
 
-            // Ajuste seguro sin importar si viene "Pendiente", "pendiente", "PENDIENTE" o con espacios
             var pendientesValidar = await registrosActivos
                 .CountAsync(x => x.EstadoSolicitud != null
                              && x.EstadoSolicitud.Clave != null
@@ -93,6 +92,7 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
                 PendientesValidar = pendientesValidar
             };
         }
+
         // =========================
         // APOYOS POR MES (gráfica de barras)
         // =========================
@@ -180,15 +180,19 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
                 .ToListAsync();
 
             var pendientes = await registrosDelAnio
-                  .CountAsync(x => x.EstadoSolicitud != null
-                               && x.EstadoSolicitud.Clave != null
-                               && x.EstadoSolicitud.Clave.Trim().ToLower() == "pendiente");
+                .CountAsync(x => x.EstadoSolicitud != null
+                             && x.EstadoSolicitud.Clave != null
+                             && x.EstadoSolicitud.Clave.Trim().ToLower() == "pendiente");
 
             var validados = await registrosDelAnio
-                .CountAsync(x => x.EstadoSolicitud.Clave == "Validado");
+                .CountAsync(x => x.EstadoSolicitud != null
+                             && x.EstadoSolicitud.Clave != null
+                             && x.EstadoSolicitud.Clave.Trim().ToLower() == "validado");
 
             var aprobados = await registrosDelAnio
-                .CountAsync(x => x.EstadoSolicitud.Clave == "Aprobado");
+                .CountAsync(x => x.EstadoSolicitud != null
+                             && x.EstadoSolicitud.Clave != null
+                             && x.EstadoSolicitud.Clave.Trim().ToLower() == "aprobado");
 
             return new TopComunidadesDto
             {
