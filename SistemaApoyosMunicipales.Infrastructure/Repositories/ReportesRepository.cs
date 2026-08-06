@@ -89,6 +89,7 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
 
         // =========================
         // APOYOS DE UNA COMUNIDAD (detalle del reporte por comunidad)
+        // Usado en: PDF Individual | Excel por Comunidad
         // =========================
         public async Task<List<ReporteApoyoDetalleDto>> ObtenerApoyosDeComunidadAsync(
             Guid comunidadId,
@@ -119,6 +120,7 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
                 SELECT
                     r.folio                AS Folio,
                     a.nombre                AS Fondo,
+                    a.descripcion           AS Descripcion,
                     r.fecha_apoyo            AS FechaApoyo,
                     r.monto_otorgado        AS MontoOtorgado,
                     es.nombre                AS Estado
@@ -138,6 +140,7 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
 
         // =========================
         // TODOS LOS APOYOS (global, con filtros de comunidad y/o fondo)
+        // Usado en: Excel General
         // =========================
         public async Task<List<ReporteApoyoGlobalDto>> ObtenerTodosLosApoyosAsync(
             DateTimeOffset desde,
@@ -173,6 +176,7 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
             r.folio               AS Folio,
             c.nombre               AS Comunidad,
             a.nombre               AS Fondo,
+            a.descripcion          AS Descripcion,
             r.fecha_apoyo           AS FechaApoyo,
             r.monto_otorgado       AS MontoOtorgado,
             es.nombre               AS Estado
@@ -192,6 +196,7 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
 
         // =========================
         // RESUMEN POR FONDO (catálogo "apoyos" agrupado)
+        // Usado en: Excel Fondos (sin Descripción, según especificación)
         // =========================
         public async Task<List<ReporteFondoDto>> ObtenerResumenPorFondoAsync(
             DateTimeOffset desde,

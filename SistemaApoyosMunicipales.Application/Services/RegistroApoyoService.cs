@@ -89,26 +89,15 @@ namespace SistemaApoyosMunicipales.Application.Services
                 throw new NotFoundException("El registro de apoyo no existe.");
             }
 
-            var folio = dto.Folio.Trim().ToUpperInvariant();
-
-            if (string.IsNullOrWhiteSpace(folio))
-            {
-                throw new ValidationException("El folio es obligatorio.");
-            }
-
-            if (await _registroRepository.ExisteFolioEnOtroRegistroAsync(folio, id))
-            {
-                throw new ValidationException("Ya existe otro apoyo registrado con ese folio.");
-            }
-
             ValidarDatosRegistro(
                 dto.ApoyoId,
                 dto.ComunidadId,
                 dto.EstadoSolicitudId,
                 dto.MontoOtorgado);
 
-            // Actualizar datos del registro
-            registro.Folio = folio;
+            // El folio es inmutable: se genera una única vez al crear el registro
+            // (ver CrearAsync -> ObtenerSiguienteFolioAsync). Nunca se toca en edición,
+            // así se evita el falso "ya existe otro apoyo con ese folio" al guardar cambios.
             registro.ApoyoId = dto.ApoyoId;
             registro.ComunidadId = dto.ComunidadId;
             registro.EstadoSolicitudId = dto.EstadoSolicitudId;
@@ -160,7 +149,7 @@ namespace SistemaApoyosMunicipales.Application.Services
         }
 
 
-        
+
         // =========================
         // OBTENER POR ID
         // =========================
