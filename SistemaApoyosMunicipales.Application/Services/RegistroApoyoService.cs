@@ -443,6 +443,15 @@ namespace SistemaApoyosMunicipales.Application.Services
                 "otro"
             };
 
+        private static readonly HashSet<string> MetodosPagoValidos =
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+                "efectivo",
+                "transferencia",
+                "deposito",
+                "cheque"
+            };
+
         private async Task<List<RegistroApoyoDocumento>> SubirDocumentosAsync(
             Guid registroId,
             List<IFormFile> archivos,
@@ -479,6 +488,24 @@ namespace SistemaApoyosMunicipales.Application.Services
             if (montos is not null && montos.Any(monto => monto < 0))
             {
                 throw new ValidationException("Los montos de los documentos no pueden ser negativos.");
+            }
+
+            if (metodosPago is not null)
+            {
+                foreach (var metodo in metodosPago)
+                {
+                    if (string.IsNullOrWhiteSpace(metodo))
+                    {
+                        continue;
+                    }
+
+                    if (!MetodosPagoValidos.Contains(metodo))
+                    {
+                        throw new BadRequestException(
+                            $"'{metodo}' no es un método de pago válido. " +
+                            "Usa: efectivo, transferencia, deposito o cheque.");
+                    }
+                }
             }
 
             var documentos = new List<RegistroApoyoDocumento>();
@@ -524,7 +551,7 @@ namespace SistemaApoyosMunicipales.Application.Services
                     var metodoPago = metodosPago is not null &&
                                      index < metodosPago.Count &&
                                      !string.IsNullOrWhiteSpace(metodosPago[index])
-                        ? metodosPago[index].Trim()
+                        ? metodosPago[index].Trim().ToLowerInvariant()
                         : null;
 
                     var fechaFacturado = fechasFacturado is not null &&
