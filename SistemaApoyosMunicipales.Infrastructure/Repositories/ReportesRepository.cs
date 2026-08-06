@@ -120,7 +120,7 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
                 SELECT
                     r.folio                AS Folio,
                     a.nombre                AS Fondo,
-                    a.descripcion           AS Descripcion,
+                    r.observaciones          AS Descripcion,
                     r.fecha_apoyo            AS FechaApoyo,
                     r.monto_otorgado        AS MontoOtorgado,
                     es.nombre                AS Estado
@@ -176,7 +176,7 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
             r.folio               AS Folio,
             c.nombre               AS Comunidad,
             a.nombre               AS Fondo,
-            a.descripcion          AS Descripcion,
+            r.observaciones        AS Descripcion,
             r.fecha_apoyo           AS FechaApoyo,
             r.monto_otorgado       AS MontoOtorgado,
             es.nombre               AS Estado
