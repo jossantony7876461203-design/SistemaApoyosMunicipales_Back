@@ -214,5 +214,15 @@ namespace SistemaApoyosMunicipales.Infrastructure.Repositories
                 .OrderBy(x => x.Nombre)
                 .ToListAsync();
         }
+
+
+        public async Task<string> ObtenerSiguienteFolioAsync()
+        {
+            var numero = await _context.Database
+                .SqlQueryRaw<long>("SELECT nextval('registros_apoyo_folio_seq') AS \"Value\"")
+                .FirstAsync();
+
+            return $"APOYO-{numero:D5}";
+        }
     }
 }

@@ -32,20 +32,13 @@ namespace SistemaApoyosMunicipales.Application.Services
         // =========================
         public async Task<Guid> CrearAsync(CrearRegistroApoyoDto dto, Guid usuarioId)
         {
-            var folio = dto.Folio.Trim().ToUpperInvariant();
-
-            if (string.IsNullOrWhiteSpace(folio))
-                throw new ValidationException("El folio es obligatorio.");
-
-            if (await _registroRepository.ExisteFolioAsync(folio))
-                throw new ValidationException("Ya existe un apoyo registrado con ese folio.");
-
             ValidarDatosRegistro(dto.ApoyoId, dto.ComunidadId, dto.EstadoSolicitudId, dto.MontoOtorgado);
 
             if (usuarioId == Guid.Empty)
                 throw new UnauthorizedException("No se pudo identificar al usuario autenticado.");
 
-
+            // El folio ya no lo manda el front — se genera aquí, garantizado único por la secuencia de BD
+            var folio = await _registroRepository.ObtenerSiguienteFolioAsync();
 
             var registro = new RegistroApoyo
             {
@@ -63,13 +56,10 @@ namespace SistemaApoyosMunicipales.Application.Services
                 UpdatedAt = DateTimeOffset.UtcNow
             };
 
-     
-
-            // Subir documentos si existen
             if (dto.Archivos is not null && dto.Archivos.Count > 0)
             {
                 var nuevosDocumentos = await SubirDocumentosAsync(
-                    registro.Id,  // CORREGIDO: usar registro.Id
+                    registro.Id,
                     dto.Archivos,
                     dto.Montos,
                     dto.TiposDocumento,
@@ -78,7 +68,7 @@ namespace SistemaApoyosMunicipales.Application.Services
                     dto.MetodosPago,
                     dto.FechasFacturado);
 
-                foreach (var documento in nuevosDocumentos)  // CORREGIDO: usar nuevosDocumentos
+                foreach (var documento in nuevosDocumentos)
                     registro.Documentos.Add(documento);
             }
 
@@ -87,7 +77,6 @@ namespace SistemaApoyosMunicipales.Application.Services
 
             return registro.Id;
         }
-
         // =========================
         // ACTUALIZAR - CORREGIDO
         // =========================

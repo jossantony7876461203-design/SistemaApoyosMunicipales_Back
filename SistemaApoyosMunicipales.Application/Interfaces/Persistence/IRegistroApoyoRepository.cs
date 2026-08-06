@@ -53,5 +53,7 @@ namespace SistemaApoyosMunicipales.Application.Interfaces.Persistence
             ObtenerEstadosSolicitudAsync();
 
 
+        Task<string> ObtenerSiguienteFolioAsync();
+
     }
 }

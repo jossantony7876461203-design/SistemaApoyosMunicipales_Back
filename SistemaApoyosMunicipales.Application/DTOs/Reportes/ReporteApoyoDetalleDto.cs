@@ -12,5 +12,7 @@ namespace SistemaApoyosMunicipales.Application.DTOs.Reportes
         public decimal MontoOtorgado { get; set; }
         public string Estado { get; set; } = string.Empty;
         public string Beneficiario { get; set; } = string.Empty;
+        public string Descripcion { get; set; } = string.Empty;
+
     }
 }

@@ -19,7 +19,8 @@ namespace SistemaApoyosMunicipales.Application.Interfaces.Persistence
         Task<IEnumerable<Rol>> ObtenerActivosAsync();
         Task ActualizarAsync(Rol rol);
         Task CambiarEstatusAsync(Guid id, bool activo);
- 
+     
+
     }
 
 

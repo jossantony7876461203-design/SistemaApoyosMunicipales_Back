@@ -12,5 +12,7 @@ namespace SistemaApoyosMunicipales.Application.DTOs.Reportes
         public DateTimeOffset FechaApoyo { get; set; }
         public decimal MontoOtorgado { get; set; }
         public string Estado { get; set; } = default!;
+        public string Descripcion { get; set; } = string.Empty;
+
     }
 }

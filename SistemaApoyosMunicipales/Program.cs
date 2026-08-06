@@ -27,7 +27,8 @@ builder.Services.AddCors(options =>
                 "http://127.0.0.1:5173",
                 "http://192.168.0.100:5173",
                 "http://localhost:3000",
-                "https://amtda-apoyos-municipales-tula-de-al.vercel.app" // 👈 Corregido: Sin barra al final
+                "https://amtda-apoyos-municipales-tula-de-al.vercel.app",
+                "https://amtda-apoyos-municipales-tula-de-al.vercel.app"// 👈 Corregido: Sin barra al final
             )
             .AllowAnyHeader()
             .AllowAnyMethod()
